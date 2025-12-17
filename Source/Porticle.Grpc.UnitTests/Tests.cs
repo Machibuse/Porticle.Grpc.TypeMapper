@@ -14,13 +14,9 @@ public sealed class Tests
     [TestMethod]
     public void TestWithNull()
     {
-        var message = new TestMessageMapped
-        {
-            SingleGuid = Guid4,
-            SingleNullableGuid = null,
-            SingleNullableString = null,
-            ListOfGuid = { Guid1, Guid2, Guid3 }
-        };
+        Guid[] guids = [Guid1, Guid2, Guid3];
+
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleNullableGuid = null, SingleNullableString = null, ListOfGuid = { guids } };
 
         var byteArray = message.ToByteArray();
 
@@ -39,13 +35,7 @@ public sealed class Tests
     [TestMethod]
     public void TestWithoutNull()
     {
-        var message = new TestMessageMapped
-        {
-            SingleGuid = Guid4,
-            SingleNullableGuid = Guid5,
-            SingleNullableString = "Hello",
-            ListOfGuid = { Guid1, Guid2, Guid3 }
-        };
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleNullableGuid = Guid5, SingleNullableString = "Hello", ListOfGuid = { Guid1, Guid2, Guid3 } };
 
         var byteArray = message.ToByteArray();
 
@@ -66,10 +56,7 @@ public sealed class Tests
     {
         var message = new TestMessage
         {
-            SingleGuid = Guid4.ToString(),
-            SingleNullableGuid = null,
-            SingleNullableString = null,
-            ListOfGuid = { Guid1.ToString(), Guid2.ToString(), Guid3.ToString() }
+            SingleGuid = Guid4.ToString(), SingleNullableGuid = null, SingleNullableString = null, ListOfGuid = { Guid1.ToString(), Guid2.ToString(), Guid3.ToString() }
         };
 
         var byteArray = message.ToByteArray();
@@ -114,13 +101,7 @@ public sealed class Tests
     [TestMethod]
     public void TestMappedToUnmappedWithNull()
     {
-        var message = new TestMessageMapped
-        {
-            SingleGuid = Guid4,
-            SingleNullableGuid = null,
-            SingleNullableString = null,
-            ListOfGuid = { Guid1, Guid2, Guid3 }
-        };
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleNullableGuid = null, SingleNullableString = null, ListOfGuid = { Guid1, Guid2, Guid3 } };
 
         var byteArray = message.ToByteArray();
 
@@ -139,13 +120,7 @@ public sealed class Tests
     [TestMethod]
     public void TestMappedToUnmappedWithoutNull()
     {
-        var message = new TestMessageMapped
-        {
-            SingleGuid = Guid4,
-            SingleNullableGuid = Guid5,
-            SingleNullableString = "Hello",
-            ListOfGuid = { Guid1, Guid2, Guid3 }
-        };
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleNullableGuid = Guid5, SingleNullableString = "Hello", ListOfGuid = { Guid1, Guid2, Guid3 } };
 
         var byteArray = message.ToByteArray();
 

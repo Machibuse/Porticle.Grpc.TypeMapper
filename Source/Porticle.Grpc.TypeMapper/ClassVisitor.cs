@@ -22,7 +22,11 @@ public class ClassVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings,
         var propertyVisitor = new PropertyVisitor(log, wrapAllNonNullableStrings, wrapAllNullableStringValues);
         node = (ClassDeclarationSyntax)propertyVisitor.Visit(node);
 
-        if (propertyVisitor.NeedGuidConverter) node = node.AddMembers(ClassFromSource(ListWrappers.RepeatedFieldGuidWrapper));
+        if (propertyVisitor.NeedGuidConverter)
+        {
+            node = node.AddMembers(ClassFromSource(ListWrappers.RepeatedFieldGuidWrapper));
+            node = node.AddMembers(InterfaceFromSource(ListWrappers.IListWithRangeAdd));
+        }
 
         var methodVisitor = new MethodVisitor(propertyVisitor.ReplaceProps);
         node = (ClassDeclarationSyntax)methodVisitor.Visit(node);
@@ -34,11 +38,15 @@ public class ClassVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings,
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(classCode);
         var root = syntaxTree.GetRoot();
-        var nestedClass = root.DescendantNodes()
-            .OfType<ClassDeclarationSyntax>()
-            .Single();
-        return nestedClass
-            .WithLeadingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-            .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+        var nestedClass = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
+        return nestedClass.WithLeadingTrivia(SyntaxFactory.CarriageReturnLineFeed).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+    }
+
+    private static InterfaceDeclarationSyntax InterfaceFromSource(string classCode)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(classCode);
+        var root = syntaxTree.GetRoot();
+        var nestedClass = root.DescendantNodes().OfType<InterfaceDeclarationSyntax>().Single();
+        return nestedClass.WithLeadingTrivia(SyntaxFactory.CarriageReturnLineFeed).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
     }
 }

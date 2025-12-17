@@ -2,80 +2,91 @@
 
 public static class ListWrappers
 {
-    public static string RepeatedFieldGuidWrapper =
-        """
-        class RepeatedFieldGuidWrapper : System.Collections.Generic.IList<System.Guid>
-        {
-            private readonly Google.Protobuf.Collections.RepeatedField<string> _internList;
+    public static string IListWithRangeAdd = """
+                                             public interface IListWithRangeAdd<T> : System.Collections.Generic.IList<T>
+                                             {
+                                                 void Add(IEnumerable<T> items);                   
+                                             }        
+                                             """;
 
-            public RepeatedFieldGuidWrapper(Google.Protobuf.Collections.RepeatedField<string> internList)
-            {
-                this._internList = internList;
-            }
+    public static string RepeatedFieldGuidWrapper = """
+                                                    class RepeatedFieldGuidWrapper : IListWithRangeAdd<System.Guid>
+                                                    {
+                                                        private readonly Google.Protobuf.Collections.RepeatedField<string> _internList;
 
-            public System.Collections.Generic.IEnumerator<System.Guid> GetEnumerator()
-            {
-                using var enumerator = _internList.GetEnumerator();
-                while (enumerator.MoveNext())
-                {
-                    yield return System.Guid.Parse(enumerator.Current);
-                }
-            }
+                                                        public RepeatedFieldGuidWrapper(Google.Protobuf.Collections.RepeatedField<string> internList)
+                                                        {
+                                                            this._internList = internList;
+                                                        }
 
-            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-            {
-                return GetEnumerator();
-            }
+                                                        public System.Collections.Generic.IEnumerator<System.Guid> GetEnumerator()
+                                                        {
+                                                            using var enumerator = _internList.GetEnumerator();
+                                                            while (enumerator.MoveNext())
+                                                            {
+                                                                yield return System.Guid.Parse(enumerator.Current);
+                                                            }
+                                                        }
 
-            public void Add(System.Guid item)
-            {
-                _internList.Add(item.ToString("D"));
-            }
+                                                        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+                                                        {
+                                                            return GetEnumerator();
+                                                        }
 
-            public void Clear()
-            {
-                _internList.Clear();
-            }
+                                                        public void Add(System.Guid item)
+                                                        {
+                                                            _internList.Add(item.ToString("D"));
+                                                        }
 
-            public bool Contains(System.Guid item)
-            {
-                return _internList.Contains(item.ToString("D"));
-            }
+                                                        public void Add(IEnumerable<System.Guid> items)
+                                                        {
+                                                            _internList.AddRange(items.Select(i => i.ToString("D")));
+                                                        }
 
-            public void CopyTo(System.Guid[] array, int arrayIndex)
-            {
-                System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_internList, System.Guid.Parse)).CopyTo(array, arrayIndex);
-            }
+                                                        public void Clear()
+                                                        {
+                                                            _internList.Clear();
+                                                        }
 
-            public bool Remove(System.Guid item)
-            {
-                return _internList.Remove(item.ToString("D"));
-            }
+                                                        public bool Contains(System.Guid item)
+                                                        {
+                                                            return _internList.Contains(item.ToString("D"));
+                                                        }
 
-            public int Count => _internList.Count;
-            
-            public bool IsReadOnly => _internList.IsReadOnly;
-            
-            public int IndexOf(System.Guid item)
-            {
-                return _internList.IndexOf(item.ToString("D"));
-            }
+                                                        public void CopyTo(System.Guid[] array, int arrayIndex)
+                                                        {
+                                                            System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_internList, System.Guid.Parse)).CopyTo(array, arrayIndex);
+                                                        }
 
-            public void Insert(int index, System.Guid item)
-            {
-                _internList.Insert(index, item.ToString("D"));
-            }
+                                                        public bool Remove(System.Guid item)
+                                                        {
+                                                            return _internList.Remove(item.ToString("D"));
+                                                        }
 
-            public void RemoveAt(int index)
-            {
-                _internList.RemoveAt(index);
-            }
+                                                        public int Count => _internList.Count;
+                                                        
+                                                        public bool IsReadOnly => _internList.IsReadOnly;
+                                                        
+                                                        public int IndexOf(System.Guid item)
+                                                        {
+                                                            return _internList.IndexOf(item.ToString("D"));
+                                                        }
 
-            public System.Guid this[int index]
-            {
-                get =>  System.Guid.Parse(_internList[index]);
-                set => _internList[index] = value.ToString("D");
-            }
-        }
-        """;
+                                                        public void Insert(int index, System.Guid item)
+                                                        {
+                                                            _internList.Insert(index, item.ToString("D"));
+                                                        }
+
+                                                        public void RemoveAt(int index)
+                                                        {
+                                                            _internList.RemoveAt(index);
+                                                        }
+
+                                                        public System.Guid this[int index]
+                                                        {
+                                                            get =>  System.Guid.Parse(_internList[index]);
+                                                            set => _internList[index] = value.ToString("D");
+                                                        }
+                                                    }
+                                                    """;
 }

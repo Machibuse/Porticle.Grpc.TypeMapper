@@ -54,16 +54,11 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
             var originalReturnExpression = returnStatement.Expression;
 
-            var containingClass = property.Ancestors()
-                .OfType<ClassDeclarationSyntax>()
-                .FirstOrDefault();
+            var containingClass = property.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
 
 
-            var matchingField = containingClass.CheckNotNull("Containing class not found").Members
-                .OfType<FieldDeclarationSyntax>()
-                .FirstOrDefault(field =>
-                    field.Declaration.Variables.Any(v => v.Identifier.Text == "_repeated_" + originalReturnExpression.ToFullString() + "codec")
-                );
+            var matchingField = containingClass.CheckNotNull("Containing class not found").Members.OfType<FieldDeclarationSyntax>().FirstOrDefault(field =>
+                field.Declaration.Variables.Any(v => v.Identifier.Text == "_repeated_" + originalReturnExpression.ToFullString() + "codec"));
 
             var isNullable = matchingField.CheckNotNull("Matching field not found").ToFullString().Contains("ForClassWrapper<string>");
 
@@ -76,14 +71,13 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
                 else
                 {
                     NeedGuidConverter = true;
-                    var newReturnExpression = SyntaxFactory.InvocationExpression(
-                        SyntaxFactory.ParseExpression("new RepeatedFieldGuidWrapper"), // Die Methode
+                    var newReturnExpression = SyntaxFactory.InvocationExpression(SyntaxFactory.ParseExpression("new RepeatedFieldGuidWrapper"), // Die Methode
                         SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(originalReturnExpression))));
                     var newReturnStatement = returnStatement.WithExpression(newReturnExpression).WithTrailingTrivia(SyntaxFactory.Space);
                     var newGetterBody = SyntaxFactory.Block(newReturnStatement);
                     var newGetter = getter.WithBody(newGetterBody.WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed));
                     property = property.ReplaceNode(getter, newGetter);
-                    return property.WithType(SyntaxFactory.ParseTypeName("System.Collections.Generic.IList<Guid>").WithTrailingTrivia(SyntaxFactory.ElasticSpace));
+                    return property.WithType(SyntaxFactory.ParseTypeName("IListWithRangeAdd<Guid>").WithTrailingTrivia(SyntaxFactory.ElasticSpace));
                 }
             }
 
@@ -116,10 +110,7 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
         var setter = property.GetSetter();
 
-        var assignment = setter.Body!.Statements
-            .OfType<ExpressionStatementSyntax>()
-            .Select(s => (s.Expression as AssignmentExpressionSyntax)!)
-            .ToArray();
+        var assignment = setter.Body!.Statements.OfType<ExpressionStatementSyntax>().Select(s => (s.Expression as AssignmentExpressionSyntax)!).ToArray();
 
         if (assignment.Length != 2) throw new TypeMapperException("Exactly 2 Assignment expressions expected in optional setter");
 
@@ -127,14 +118,8 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
         var setValueAssignment = assignment[1];
 
         // Erzeuge neuen Ausdruck: <setBitAssignment.left> &= ~<setBitAssignment.right>
-        var deleteBitAssignment = SyntaxFactory.AssignmentExpression(
-            SyntaxKind.AndAssignmentExpression,
-            setBitAssignment.Left,
-            SyntaxFactory.PrefixUnaryExpression(
-                SyntaxKind.BitwiseNotExpression,
-                setBitAssignment.Right.WithoutTrivia()
-            )
-        ).WithTriviaFrom(setBitAssignment);
+        var deleteBitAssignment = SyntaxFactory.AssignmentExpression(SyntaxKind.AndAssignmentExpression, setBitAssignment.Left,
+            SyntaxFactory.PrefixUnaryExpression(SyntaxKind.BitwiseNotExpression, setBitAssignment.Right.WithoutTrivia())).WithTriviaFrom(setBitAssignment);
 
         // New assignment: enumOptional_ = <defaultValueIdentifierName>
         var setDefaultValueAssignment = setValueAssignment.WithRight(defaultValueExpression);
@@ -145,41 +130,23 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
                 SyntaxFactory.IdentifierName("Value")));
 
 
-        var newSetter = SyntaxFactory.AccessorDeclaration(SyntaxKind.SetAccessorDeclaration)
-            .WithBody(SyntaxFactory.Block(
-                    SyntaxFactory.SingletonList<StatementSyntax>(
-                        SyntaxFactory.IfStatement(
-                                SyntaxFactory.BinaryExpression(
-                                    SyntaxKind.EqualsExpression,
-                                    SyntaxFactory.IdentifierName("value"),
-                                    SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression)
-                                ),
-                                SyntaxFactory.Block(
-                                    new List<StatementSyntax>([
-                                        SyntaxFactory.ExpressionStatement(deleteBitAssignment.WithoutTrivia()),
-                                        SyntaxFactory.ExpressionStatement(setDefaultValueAssignment.WithoutTrivia())
-                                    ])
-                                )
-                            )
-                            .WithElse(SyntaxFactory.ElseClause(
-                                    SyntaxFactory.Block(
-                                        new List<StatementSyntax>
-                                        {
-                                            SyntaxFactory.ExpressionStatement(setBitAssignment.WithoutTrivia()),
-                                            SyntaxFactory.ExpressionStatement(setValueAssignment.WithoutTrivia())
-                                        })
-                                )
-                            ).WithLeadingTrivia(SyntaxFactory.Space).WithTrailingTrivia(SyntaxFactory.Space))
-                )
-            ).WithTriviaFrom(setter);
+        var newSetter = SyntaxFactory.AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithBody(SyntaxFactory.Block(SyntaxFactory.SingletonList<StatementSyntax>(SyntaxFactory
+            .IfStatement(
+                SyntaxFactory.BinaryExpression(SyntaxKind.EqualsExpression, SyntaxFactory.IdentifierName("value"),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression)), SyntaxFactory.Block(new List<StatementSyntax>([
+                    SyntaxFactory.ExpressionStatement(deleteBitAssignment.WithoutTrivia()),
+                    SyntaxFactory.ExpressionStatement(setDefaultValueAssignment.WithoutTrivia())
+                ]))).WithElse(SyntaxFactory.ElseClause(SyntaxFactory.Block(new List<StatementSyntax>
+            {
+                SyntaxFactory.ExpressionStatement(setBitAssignment.WithoutTrivia()), SyntaxFactory.ExpressionStatement(setValueAssignment.WithoutTrivia())
+            }))).WithLeadingTrivia(SyntaxFactory.Space).WithTrailingTrivia(SyntaxFactory.Space)))).WithTriviaFrom(setter);
 
 
         //ReplaceProps.Add(new PropertyToField(property.Identifier.ValueText, setValueAssignment.Left.WithoutTrivia().ToFullString()));
         //ClearFunctions.Add(new ClearFunction("Clear" + property.Identifier.ValueText, SyntaxFactory.ExpressionStatement(setDefaultValueAssignment.WithoutTrivia())));
         property = property.ReplaceNode(setter, newSetter);
         property = property.ReplaceNode(setter, newSetter);
-        return property.ReplaceNode(setter, newSetter)
-            .ReplaceNode(getter, newGetter)
+        return property.ReplaceNode(setter, newSetter).ReplaceNode(getter, newGetter)
             .WithType(SyntaxFactory.NullableType(property.Type.WithoutTrivia()).WithTriviaFrom(property.Type));
     }
 
@@ -211,10 +178,8 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
         var leadingTrivia = SyntaxFactory.TriviaList(enableDirective, SyntaxFactory.ElasticCarriageReturnLineFeed);
         var trailingTrivia = SyntaxFactory.TriviaList(SyntaxFactory.ElasticCarriageReturnLineFeed, disableDirective);
 
-        return property
-            .WithType(SyntaxFactory.ParseTypeName("string?").WithTrailingTrivia(SyntaxFactory.ElasticSpace))
-            .WithLeadingTrivia(leadingTrivia.AddRange(property.GetLeadingTrivia()))
-            .WithTrailingTrivia(property.GetTrailingTrivia().AddRange(trailingTrivia));
+        return property.WithType(SyntaxFactory.ParseTypeName("string?").WithTrailingTrivia(SyntaxFactory.ElasticSpace))
+            .WithLeadingTrivia(leadingTrivia.AddRange(property.GetLeadingTrivia())).WithTrailingTrivia(property.GetTrailingTrivia().AddRange(trailingTrivia));
     }
 
     private PropertyDeclarationSyntax? ConvertToNonNullableStringProperty(PropertyDeclarationSyntax property)
@@ -235,9 +200,7 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
         var leadingTrivia = SyntaxFactory.TriviaList(enableDirective, SyntaxFactory.ElasticCarriageReturnLineFeed);
         var trailingTrivia = SyntaxFactory.TriviaList(SyntaxFactory.ElasticCarriageReturnLineFeed, disableDirective);
 
-        return property
-            .WithLeadingTrivia(leadingTrivia.AddRange(property.GetLeadingTrivia()))
-            .WithTrailingTrivia(property.GetTrailingTrivia().AddRange(trailingTrivia));
+        return property.WithLeadingTrivia(leadingTrivia.AddRange(property.GetLeadingTrivia())).WithTrailingTrivia(property.GetTrailingTrivia().AddRange(trailingTrivia));
     }
 
     private PropertyDeclarationSyntax? ConvertToGuidProperty(PropertyDeclarationSyntax property)
@@ -307,8 +270,7 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
         ReplaceProps.Add(new PropertyToField(property.Identifier.ValueText, identifierNameSyntax.Identifier.ValueText));
 
-        var newReturnExpression = SyntaxFactory.InvocationExpression(
-            SyntaxFactory.ParseExpression("global::System.Guid.Parse"), // Die Methode
+        var newReturnExpression = SyntaxFactory.InvocationExpression(SyntaxFactory.ParseExpression("global::System.Guid.Parse"), // Die Methode
             SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(originalReturnExpression))));
 
         var newReturnStatement = returnStatement.WithExpression(newReturnExpression).WithTrailingTrivia(SyntaxFactory.Space);
@@ -318,9 +280,9 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
         {
             // Statement: if (variable == null) return null;
             var ifStatement = SyntaxFactory.IfStatement(
-                SyntaxFactory.BinaryExpression(SyntaxKind.EqualsExpression, originalReturnExpression, SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression)),
-                SyntaxFactory.ReturnStatement(SyntaxFactory.LiteralExpression(SyntaxKind.DefaultLiteralExpression).WithLeadingTrivia(SyntaxFactory.Space))
-            ).WithTrailingTrivia(SyntaxFactory.Space);
+                    SyntaxFactory.BinaryExpression(SyntaxKind.EqualsExpression, originalReturnExpression, SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression)),
+                    SyntaxFactory.ReturnStatement(SyntaxFactory.LiteralExpression(SyntaxKind.DefaultLiteralExpression).WithLeadingTrivia(SyntaxFactory.Space)))
+                .WithTrailingTrivia(SyntaxFactory.Space);
 
             newGetterBody = SyntaxFactory.Block(ifStatement, newReturnStatement);
         }
@@ -344,10 +306,7 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
     private static AssignmentExpressionSyntax GetAssignmentExpression(AccessorDeclarationSyntax setter)
     {
-        var assignment = setter.Body!.Statements
-            .OfType<ExpressionStatementSyntax>()
-            .Select(s => s.Expression as AssignmentExpressionSyntax)
-            .FirstOrDefault();
+        var assignment = setter.Body!.Statements.OfType<ExpressionStatementSyntax>().Select(s => s.Expression as AssignmentExpressionSyntax).FirstOrDefault();
 
         if (assignment == null) throw new TypeMapperException("Setter has no valid assignment expression");
 
