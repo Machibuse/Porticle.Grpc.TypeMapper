@@ -33,7 +33,7 @@ Code.
 - Add `// [NullableEnum]` as comment to an optional enum proto field to get MyEnum? in generated c# code
 - Add PorticleGrpcTypeMapper_WrapAllNonNullableStrings as Property to your Project to wrap all not nullable proto stings in #nullable enable/disable
 - Add PorticleGrpcTypeMapper_WrapAllNullableStrings as Property to your Project to wrap all proto StringValue fields in #nullable enable/disable and change `string` to `string?`
-There are three things you can do in your .proto files:
+
 
 ## Installation
 
@@ -61,6 +61,8 @@ After installing the Package, this Post build step ist dynamically added to your
 Don't wonder ist you cant se it in your csproj file. It is dynamically added when your build is processed.
 
 ## Usage
+
+There are three things you can do in your .proto files:
 
 - Add `// [GrpcGuid]` as comment to a string field - Converts the corresponding c# string property to Guid
 - Add `// [GrpcGuid]` as comment to a StringValue field - Converts the corresponding c# string property to Guid?
