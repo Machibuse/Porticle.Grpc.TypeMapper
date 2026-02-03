@@ -5,7 +5,7 @@ public static class ListWrappers
     public static string IListWithRangeAdd = """
                                              public interface IListWithRangeAdd<T> : System.Collections.Generic.IList<T>, System.Collections.IList
                                              {
-                                                 void Add(IEnumerable<T> items);                   
+                                                 void Add(IEnumerable<T> items);
                                              }        
                                              """;
 
