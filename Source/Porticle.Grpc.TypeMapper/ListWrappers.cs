@@ -64,9 +64,9 @@ public static class ListWrappers
                                                         }
 
                                                         public int Count => _internList.Count;
-                                                        
+
                                                         public bool IsReadOnly => _internList.IsReadOnly;
-                                                        
+
                                                         public int IndexOf(System.Guid item)
                                                         {
                                                             return _internList.IndexOf(item.ToString("D"));
@@ -87,6 +87,85 @@ public static class ListWrappers
                                                             get =>  System.Guid.Parse(_internList[index]);
                                                             set => _internList[index] = value.ToString("D");
                                                         }
+
+                                                        // IList (non-generic) explicit implementation
+                                                        int System.Collections.IList.Add(object value)
+                                                        {
+                                                            if (value is System.Guid guid)
+                                                            {
+                                                                Add(guid);
+                                                                return Count - 1;
+                                                            }
+                                                            throw new System.ArgumentException("Value must be of type System.Guid", nameof(value));
+                                                        }
+
+                                                        bool System.Collections.IList.Contains(object value)
+                                                        {
+                                                            if (value is System.Guid guid)
+                                                            {
+                                                                return Contains(guid);
+                                                            }
+                                                            return false;
+                                                        }
+
+                                                        int System.Collections.IList.IndexOf(object value)
+                                                        {
+                                                            if (value is System.Guid guid)
+                                                            {
+                                                                return IndexOf(guid);
+                                                            }
+                                                            return -1;
+                                                        }
+
+                                                        void System.Collections.IList.Insert(int index, object value)
+                                                        {
+                                                            if (value is System.Guid guid)
+                                                            {
+                                                                Insert(index, guid);
+                                                                return;
+                                                            }
+                                                            throw new System.ArgumentException("Value must be of type System.Guid", nameof(value));
+                                                        }
+
+                                                        void System.Collections.IList.Remove(object value)
+                                                        {
+                                                            if (value is System.Guid guid)
+                                                            {
+                                                                Remove(guid);
+                                                            }
+                                                        }
+
+                                                        bool System.Collections.IList.IsFixedSize => false;
+
+                                                        object System.Collections.IList.this[int index]
+                                                        {
+                                                            get => this[index];
+                                                            set
+                                                            {
+                                                                if (value is System.Guid guid)
+                                                                {
+                                                                    this[index] = guid;
+                                                                    return;
+                                                                }
+                                                                throw new System.ArgumentException("Value must be of type System.Guid", nameof(value));
+                                                            }
+                                                        }
+
+                                                        // ICollection (non-generic) explicit implementation
+                                                        void System.Collections.ICollection.CopyTo(System.Array array, int index)
+                                                        {
+                                                            if (array is System.Guid[] guidArray)
+                                                            {
+                                                                CopyTo(guidArray, index);
+                                                                return;
+                                                            }
+                                                            var guids = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_internList, System.Guid.Parse));
+                                                            System.Array.Copy(guids, 0, array, index, guids.Length);
+                                                        }
+
+                                                        bool System.Collections.ICollection.IsSynchronized => false;
+
+                                                        object System.Collections.ICollection.SyncRoot => ((System.Collections.ICollection)_internList).SyncRoot;
                                                     }
                                                     """;
 }
