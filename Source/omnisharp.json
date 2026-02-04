@@ -1,0 +1,17 @@
+{
+  "RoslynExtensionsOptions": {
+    "EnableAnalyzersSupport": false,
+    "EnableDecompilationSupport": false
+  },
+  "msbuild": {
+    "loadProjectsOnDemand": true
+  },
+  "fileOptions": {
+    "systemExcludeSearchPatterns": [
+      "**/bin/**/*",
+      "**/obj/**/*",
+      "**/.git/**/*",
+      "**/node_modules/**/*"
+    ]
+  }
+}

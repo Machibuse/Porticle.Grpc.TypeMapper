@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(taskkill:*)",
+      "Bash(del \"D:\\\\GitHub\\\\Porticle.Grpc.TypeMapper\\\\Source\\\\Porticle.Grpc.TypeMapper\\\\bin\\\\Debug\\\\net9.0\\\\Porticle.Grpc.TypeMapper.dll\")"
+    ]
+  }
+}
