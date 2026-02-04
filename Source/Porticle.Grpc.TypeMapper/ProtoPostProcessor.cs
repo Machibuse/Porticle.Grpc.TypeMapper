@@ -51,7 +51,14 @@ public class ProtoPostProcessor : Task
                 var classVisitor = new ClassVisitor(Log, WrapAllNonNullableStrings, WrapAllNullableStringValues);
                 root = classVisitor.Visit(root);
 
-                File.WriteAllText(filePath, root.ToFullString());
+                var output = root.ToFullString();
+
+                // Add ICustomDiagnosticMessage to message class base lists.
+                // This is done via text replacement because Roslyn's AddBaseListTypes
+                // breaks #if/#endif preprocessor directives in the generated base list.
+                output = Regex.Replace(output, @"(: pb::IMessage<\w+>)(?!, pb::ICustomDiagnosticMessage)", "$1, pb::ICustomDiagnosticMessage");
+
+                File.WriteAllText(filePath, output);
             }
         }
 
