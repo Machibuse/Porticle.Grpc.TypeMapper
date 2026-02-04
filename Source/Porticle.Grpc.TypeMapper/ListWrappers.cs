@@ -94,8 +94,8 @@ public static class ListWrappers
 
                                                         System.Guid System.Collections.Generic.IList<System.Guid>.this[int index]
                                                         {
-                                                            get => this[index];
-                                                            set => this[index] = value;
+                                                            get => System.Guid.Parse(_internList[index]);
+                                                            set => _internList[index] = value.ToString("D");
                                                         }
 
                                                         // IList (non-generic) explicit implementation
@@ -149,12 +149,12 @@ public static class ListWrappers
 
                                                         object System.Collections.IList.this[int index]
                                                         {
-                                                            get => this[index];
+                                                            get => System.Guid.Parse(_internList[index]);
                                                             set
                                                             {
                                                                 if (value is System.Guid guid)
                                                                 {
-                                                                    this[index] = guid;
+                                                                    _internList[index] = guid.ToString("D");
                                                                     return;
                                                                 }
                                                                 throw new System.ArgumentException("Value must be of type System.Guid", nameof(value));
