@@ -65,7 +65,11 @@ public static class ListWrappers
 
                                                         public int Count => _internList.Count;
 
+                                                        int System.Collections.ICollection.Count => _internList.Count;
+
                                                         public bool IsReadOnly => _internList.IsReadOnly;
+
+                                                        bool System.Collections.IList.IsReadOnly => _internList.IsReadOnly;
 
                                                         public int IndexOf(System.Guid item)
                                                         {
@@ -86,6 +90,12 @@ public static class ListWrappers
                                                         {
                                                             get =>  System.Guid.Parse(_internList[index]);
                                                             set => _internList[index] = value.ToString("D");
+                                                        }
+
+                                                        System.Guid System.Collections.Generic.IList<System.Guid>.this[int index]
+                                                        {
+                                                            get => this[index];
+                                                            set => this[index] = value;
                                                         }
 
                                                         // IList (non-generic) explicit implementation
