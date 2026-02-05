@@ -37,7 +37,8 @@ public class ClassVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings,
         var isMessageClass = node.BaseList?.Types.Any(t => t.ToString().Contains("IMessage")) ?? false;
         if (isMessageClass)
         {
-            node = node.AddMembers(MethodFromSource("public string ToDiagnosticString() { return System.Text.Json.JsonSerializer.Serialize(this); }"));
+            node = node.AddMembers(MethodFromSource(
+                "public string ToDiagnosticString() { try { return System.Text.Json.JsonSerializer.Serialize(this); } catch(Exception ex) { return \"Message Invalid - \" + ex.Message; } }"));
         }
 
         return node;

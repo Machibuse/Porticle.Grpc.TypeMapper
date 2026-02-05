@@ -46,6 +46,18 @@ public sealed class Tests
     }
 
     [TestMethod]
+    public void TestToStringError()
+    {
+        var message = new TestMessageMapped();
+
+        // Should crash when deserializing, because "SingleGuid" backend field ist an empty string and cannot be converted to a Guid
+        var equatable = message.ToString();
+
+        // Expect Exception
+        Assert.AreEqual(equatable.Split('-').First().Trim(), "Message Invalid");
+    }
+
+    [TestMethod]
     public void TestWithoutNull()
     {
         var message = new TestMessageMapped { SingleGuid = Guid4, SingleNullableGuid = Guid5, SingleNullableString = "Hello", ListOfGuid = { Guid1, Guid2, Guid3 } };
