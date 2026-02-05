@@ -321,3 +321,5 @@ public string? OptionalParentUserId {
   function in `RepeatedField<T>`
 
 - This Tool actually is not tested with protoc / Grpc.Tools is compiled with GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE flag
+
+- All Messages implements ICustomDiagnisticMessage to prevent GRPC ToDiagnbosticString because ist crashes when Guids are converted to Strings  

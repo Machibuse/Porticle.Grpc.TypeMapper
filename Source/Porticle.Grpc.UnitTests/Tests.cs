@@ -33,6 +33,19 @@ public sealed class Tests
     }
 
     [TestMethod]
+    public void TestToString()
+    {
+        Guid[] guids = [Guid1, Guid2, Guid3];
+
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleNullableGuid = null, SingleNullableString = null, ListOfGuid = { guids } };
+
+        var customDiagnosticMessage = (ICustomDiagnosticMessage)message;
+
+        // should not crash
+        Assert.AreEqual(customDiagnosticMessage.ToString(), customDiagnosticMessage.ToDiagnosticString());
+    }
+
+    [TestMethod]
     public void TestWithoutNull()
     {
         var message = new TestMessageMapped { SingleGuid = Guid4, SingleNullableGuid = Guid5, SingleNullableString = "Hello", ListOfGuid = { Guid1, Guid2, Guid3 } };
