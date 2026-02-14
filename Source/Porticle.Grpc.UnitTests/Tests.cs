@@ -1,4 +1,5 @@
-﻿using Google.Protobuf;
+﻿using System.Globalization;
+using Google.Protobuf;
 
 namespace Porticle.Grpc.UnitTests;
 
@@ -10,6 +11,66 @@ public sealed class Tests
     private static readonly Guid Guid3 = Guid.Parse("BC483FF2-27D7-4CE7-94A1-531E61BBF549");
     private static readonly Guid Guid4 = Guid.Parse("D78E2E14-CC83-48A2-A782-E4A0807D25F4");
     private static readonly Guid Guid5 = Guid.Parse("666383AD-0637-4233-92FE-842072372FF7");
+
+    private static readonly decimal Decimal1 = 12345.6789m;
+    private static readonly decimal Decimal2 = -99999.00001m;
+
+    [TestMethod]
+    public void TestDecimalWithNull()
+    {
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleDecimal = Decimal1, SingleNullableDecimal = null };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessageMapped.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(Decimal1, deserializedMessage.SingleDecimal);
+        Assert.IsNull(deserializedMessage.SingleNullableDecimal);
+    }
+
+    [TestMethod]
+    public void TestDecimalWithoutNull()
+    {
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleDecimal = Decimal1, SingleNullableDecimal = Decimal2 };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessageMapped.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(Decimal1, deserializedMessage.SingleDecimal);
+        Assert.AreEqual(Decimal2, deserializedMessage.SingleNullableDecimal);
+    }
+
+    [TestMethod]
+    public void TestDecimalUnmappedToMapped()
+    {
+        var message = new TestMessage
+        {
+            SingleGuid = Guid4.ToString(),
+            SingleDecimal = Decimal1.ToString(CultureInfo.InvariantCulture),
+            SingleNullableDecimal = Decimal2.ToString(CultureInfo.InvariantCulture)
+        };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessageMapped.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(Decimal1, deserializedMessage.SingleDecimal);
+        Assert.AreEqual(Decimal2, deserializedMessage.SingleNullableDecimal);
+    }
+
+    [TestMethod]
+    public void TestDecimalMappedToUnmapped()
+    {
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleDecimal = Decimal1, SingleNullableDecimal = Decimal2 };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessage.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(Decimal1.ToString(CultureInfo.InvariantCulture), deserializedMessage.SingleDecimal);
+        Assert.AreEqual(Decimal2.ToString(CultureInfo.InvariantCulture), deserializedMessage.SingleNullableDecimal);
+    }
 
     [TestMethod]
     public void TestWithNull()

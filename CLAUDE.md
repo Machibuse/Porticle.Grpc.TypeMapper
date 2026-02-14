@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-Porticle.Grpc.TypeMapper is a Roslyn-based post-processor shipped as a NuGet development dependency. It hooks into the build pipeline after `Protobuf_Compile` and rewrites protoc-generated C# classes to add support for Guids, nullable strings, and nullable enums — features not natively supported by Protocol Buffers.
+Porticle.Grpc.TypeMapper is a Roslyn-based post-processor shipped as a NuGet development dependency. It hooks into the build pipeline after `Protobuf_Compile` and rewrites protoc-generated C# classes to add support for Guids, decimals, nullable strings, and nullable enums — features not natively supported by Protocol Buffers.
 
-Proto field comments (`[GrpcGuid]`, `[NullableString]`, `[NullableEnum]`) or global project properties control which transformations are applied.
+Proto field comments (`[GrpcGuid]`, `[Decimal]`, `[NullableString]`, `[NullableEnum]`) or global project properties control which transformations are applied.
 
 ## Solution Structure
 
@@ -23,7 +23,7 @@ Source/
 |------|------|
 | `ProtoPostProcessor.cs` | MSBuild Task entry point — finds generated files, runs visitors, writes output |
 | `ClassVisitor.cs` | CSharpSyntaxRewriter — orchestrates property and method transformations per class |
-| `PropertyVisitor.cs` | Rewrites property types/getters/setters (Guid, nullable string, nullable enum) |
+| `PropertyVisitor.cs` | Rewrites property types/getters/setters (Guid, decimal, nullable string, nullable enum) |
 | `MethodVisitor.cs` | Updates Equals/GetHashCode/WriteTo/MergeFrom etc. to use backing fields |
 | `PropertyToFieldRewriter.cs` | Replaces property identifiers with field names inside method bodies |
 | `ListWrappers.cs` | Source code strings for `RepeatedFieldGuidWrapper` and `IListWithRangeAdd<T>` |

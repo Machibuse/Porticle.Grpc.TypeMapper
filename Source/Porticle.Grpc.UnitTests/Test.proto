@@ -10,6 +10,8 @@ message TestMessage {
   google.protobuf.StringValue single_nullable_guid = 2;
   google.protobuf.StringValue single_nullable_string = 4;
   repeated string list_of_guid = 5;
+  string single_decimal = 8;
+  google.protobuf.StringValue single_nullable_decimal = 9;
 }
 
 message TestMessageMapped {
@@ -29,6 +31,12 @@ message TestMessageMapped {
 
   // [NullableEnum]
   optional TestEnum enum_optional = 7;
+
+  // [Decimal]
+  string single_decimal = 8;
+
+  // [Decimal]
+  google.protobuf.StringValue single_nullable_decimal = 9;
 }
 
 //////////////////////////////////////////////

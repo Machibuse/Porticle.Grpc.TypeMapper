@@ -25,6 +25,8 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
         {
             if (property.GetLeadingTrivia().ToFullString().Contains("[GrpcGuid]")) return ConvertToGuidProperty(property);
 
+            if (property.GetLeadingTrivia().ToFullString().Contains("[Decimal]")) return ConvertToDecimalProperty(property);
+
             if (wrapAllNullableStringValues || property.GetLeadingTrivia().ToFullString().Contains("[NullableString]"))
                 return ConvertToNullableStringProperty(property, wrapAllNullableStringValues);
 
@@ -79,6 +81,11 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
                     property = property.ReplaceNode(getter, newGetter);
                     return property.WithType(SyntaxFactory.ParseTypeName("IListWithRangeAdd<Guid>").WithTrailingTrivia(SyntaxFactory.ElasticSpace));
                 }
+            }
+
+            if (property.GetLeadingTrivia().ToFullString().Contains("[Decimal]"))
+            {
+                log.LogError("Decimal is not supported for repeated fields");
             }
 
             if (property.GetLeadingTrivia().ToFullString().Contains("[NullableString]"))
@@ -300,6 +307,116 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
             property = property.WithType(SyntaxFactory.ParseTypeName("global::System.Guid?").WithTrailingTrivia(SyntaxFactory.Space));
         else
             property = property.WithType(SyntaxFactory.ParseTypeName("global::System.Guid").WithTrailingTrivia(SyntaxFactory.Space));
+
+        return property;
+    }
+
+    private PropertyDeclarationSyntax? ConvertToDecimalProperty(PropertyDeclarationSyntax property)
+    {
+        var setter = property.GetSetter();
+
+        if (setter.Body == null)
+        {
+            log.LogError($"No setter found in property {property.Identifier}");
+            return null;
+        }
+
+        var isNullable = !setter.Body.ToFullString().Contains("ProtoPreconditions.CheckNotNull");
+
+        // Manipulate setter
+        var assignment = GetAssignmentExpression(setter);
+
+        var originalRightHandSide = assignment.Right;
+
+        if (!isNullable)
+        {
+            if (originalRightHandSide is not InvocationExpressionSyntax invocationExpr || !invocationExpr.Expression.ToString().EndsWith("CheckNotNull"))
+            {
+                throw new TypeMapperException($"[Error] Can't find CheckNotNull call in setter of property {property.Identifier}");
+            }
+
+            originalRightHandSide = invocationExpr.ArgumentList.Arguments.First().Expression;
+        }
+
+        var toStringMethodName = SyntaxFactory.IdentifierName("ToString");
+        var toStringArgument = SyntaxFactory.Argument(SyntaxFactory.ParseExpression("global::System.Globalization.CultureInfo.InvariantCulture"));
+        var toStringArgumentList = SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(toStringArgument));
+        var parenthesizedOriginalRightHandSide = SyntaxFactory.ParenthesizedExpression(originalRightHandSide);
+
+        ExpressionSyntax newRightHandSide = isNullable
+            ? SyntaxFactory.ConditionalAccessExpression(parenthesizedOriginalRightHandSide,
+                SyntaxFactory.InvocationExpression(SyntaxFactory.MemberBindingExpression(toStringMethodName), toStringArgumentList))
+            : SyntaxFactory.InvocationExpression(
+                SyntaxFactory.MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, parenthesizedOriginalRightHandSide, toStringMethodName), toStringArgumentList);
+        var newAssignment = assignment.WithRight(newRightHandSide);
+        var newSetter = setter.ReplaceNode(assignment, newAssignment);
+
+        property = property.ReplaceNode(setter, newSetter);
+
+        // Manipulate getter
+        var getter = property.GetGetter();
+
+        if (getter?.Body == null)
+        {
+            log.LogError($"No getter found in property {property.Identifier}");
+            return null;
+        }
+
+        var returnStatement = getter.Body?.Statements.OfType<ReturnStatementSyntax>().FirstOrDefault();
+
+        if (returnStatement?.Expression == null)
+        {
+            log.LogError($"Getter has no valid return statement in property {property.Identifier}");
+            return null;
+        }
+
+        var originalReturnExpression = returnStatement.Expression;
+
+        if (originalReturnExpression is not IdentifierNameSyntax identifierNameSyntax)
+        {
+            log.LogError($"Getter return statement should be a simple identifier in property {property.Identifier}");
+            return null;
+        }
+
+        ReplaceProps.Add(new PropertyToField(property.Identifier.ValueText, identifierNameSyntax.Identifier.ValueText));
+
+        var parseArguments = SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(new[]
+        {
+            SyntaxFactory.Argument(originalReturnExpression), SyntaxFactory.Argument(SyntaxFactory.ParseExpression("global::System.Globalization.CultureInfo.InvariantCulture"))
+        }));
+
+        var newReturnExpression = SyntaxFactory.InvocationExpression(SyntaxFactory.ParseExpression("decimal.Parse"), parseArguments);
+
+        var newReturnStatement = returnStatement.WithExpression(newReturnExpression).WithTrailingTrivia(SyntaxFactory.Space);
+
+        BlockSyntax newGetterBody;
+        if (isNullable)
+        {
+            var ifStatement = SyntaxFactory.IfStatement(
+                    SyntaxFactory.BinaryExpression(SyntaxKind.EqualsExpression, originalReturnExpression, SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression)),
+                    SyntaxFactory.ReturnStatement(SyntaxFactory.LiteralExpression(SyntaxKind.DefaultLiteralExpression).WithLeadingTrivia(SyntaxFactory.Space)))
+                .WithTrailingTrivia(SyntaxFactory.Space);
+
+            newGetterBody = SyntaxFactory.Block(ifStatement, newReturnStatement);
+        }
+        else
+        {
+            newGetterBody = SyntaxFactory.Block(newReturnStatement);
+        }
+
+        var newGetter = getter.WithBody(newGetterBody.WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed));
+
+        property = property.ReplaceNode(getter, newGetter);
+
+        // Change the type of the property
+        if (isNullable)
+        {
+            property = property.WithType(SyntaxFactory.ParseTypeName("decimal?").WithTrailingTrivia(SyntaxFactory.Space));
+        }
+        else
+        {
+            property = property.WithType(SyntaxFactory.ParseTypeName("decimal").WithTrailingTrivia(SyntaxFactory.Space));
+        }
 
         return property;
     }
