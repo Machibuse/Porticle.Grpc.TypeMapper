@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using static Porticle.Grpc.TypeMapper.SyntaxHelper;
 
 namespace Porticle.Grpc.TypeMapper;
 
@@ -42,29 +43,5 @@ public class ClassVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings,
         }
 
         return node;
-    }
-
-    private static ClassDeclarationSyntax ClassFromSource(string classCode)
-    {
-        var syntaxTree = CSharpSyntaxTree.ParseText(classCode);
-        var root = syntaxTree.GetRoot();
-        var nestedClass = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single();
-        return nestedClass.WithLeadingTrivia(SyntaxFactory.CarriageReturnLineFeed).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
-    }
-
-    private static InterfaceDeclarationSyntax InterfaceFromSource(string classCode)
-    {
-        var syntaxTree = CSharpSyntaxTree.ParseText(classCode);
-        var root = syntaxTree.GetRoot();
-        var nestedClass = root.DescendantNodes().OfType<InterfaceDeclarationSyntax>().Single();
-        return nestedClass.WithLeadingTrivia(SyntaxFactory.CarriageReturnLineFeed).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
-    }
-
-    private static MethodDeclarationSyntax MethodFromSource(string methodCode)
-    {
-        var syntaxTree = CSharpSyntaxTree.ParseText("class _ { " + methodCode + " }");
-        var root = syntaxTree.GetRoot();
-        var method = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Single();
-        return method.WithLeadingTrivia(SyntaxFactory.CarriageReturnLineFeed).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
     }
 }
