@@ -5,7 +5,10 @@
       "Bash(dotnet test:*)",
       "Bash(taskkill:*)",
       "Bash(del \"D:\\\\GitHub\\\\Porticle.Grpc.TypeMapper\\\\Source\\\\Porticle.Grpc.TypeMapper\\\\bin\\\\Debug\\\\net9.0\\\\Porticle.Grpc.TypeMapper.dll\")",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:reese.codes)"
     ]
   }
 }

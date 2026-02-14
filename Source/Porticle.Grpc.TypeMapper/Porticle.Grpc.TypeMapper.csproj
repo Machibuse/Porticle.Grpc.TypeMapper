@@ -20,6 +20,8 @@
         <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
         <PackageReadmeFile>readme.md</PackageReadmeFile>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+        <Configurations>Debug;Release;Test</Configurations>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
         <WarningsAsErrors>NU1605</WarningsAsErrors>

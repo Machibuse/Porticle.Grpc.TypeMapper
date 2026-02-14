@@ -36,8 +36,10 @@ Source/
 
 ```bash
 dotnet build Source/Porticle.Grpc.sln
-dotnet test Source/Porticle.Grpc.UnitTests
+dotnet test Source/Porticle.Grpc.UnitTests -c Test
 ```
+
+Use the **Test** solution configuration (`-c Test`) when running tests. This avoids file-lock conflicts with OmniSharp which holds DLLs from the Debug configuration.
 
 ## Coding Conventions
 
