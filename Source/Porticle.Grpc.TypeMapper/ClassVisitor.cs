@@ -29,6 +29,15 @@ public class ClassVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings,
             node = node.AddMembers(InterfaceFromSource(ListWrappers.IListWithRangeAdd));
         }
 
+        if (propertyVisitor.NeedDecimalConverter)
+        {
+            node = node.AddMembers(ClassFromSource(ListWrappers.RepeatedFieldDecimalWrapper));
+            if (!propertyVisitor.NeedGuidConverter)
+            {
+                node = node.AddMembers(InterfaceFromSource(ListWrappers.IListWithRangeAdd));
+            }
+        }
+
         var methodVisitor = new MethodVisitor(propertyVisitor.ReplaceProps);
         node = (ClassDeclarationSyntax)methodVisitor.Visit(node);
 

@@ -11,6 +11,8 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
     public bool NeedGuidConverter { get; set; }
 
+    public bool NeedDecimalConverter { get; set; }
+
 
     public override SyntaxNode? VisitPropertyDeclaration(PropertyDeclarationSyntax node)
     {
@@ -85,7 +87,14 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
             if (property.GetLeadingTrivia().ToFullString().Contains("[Decimal]"))
             {
-                log.LogError("Decimal is not supported for repeated fields");
+                NeedDecimalConverter = true;
+                var newReturnExpression = SyntaxFactory.InvocationExpression(SyntaxFactory.ParseExpression("new RepeatedFieldDecimalWrapper"),
+                    SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(originalReturnExpression))));
+                var newReturnStatement = returnStatement.WithExpression(newReturnExpression).WithTrailingTrivia(SyntaxFactory.Space);
+                var newGetterBody = SyntaxFactory.Block(newReturnStatement);
+                var newGetter = getter.WithBody(newGetterBody.WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed));
+                property = property.ReplaceNode(getter, newGetter);
+                return property.WithType(SyntaxFactory.ParseTypeName("IListWithRangeAdd<decimal>").WithTrailingTrivia(SyntaxFactory.ElasticSpace));
             }
 
             if (property.GetLeadingTrivia().ToFullString().Contains("[NullableString]"))

@@ -73,6 +73,39 @@ public sealed class Tests
     }
 
     [TestMethod]
+    public void TestRepeatedDecimal()
+    {
+        decimal[] decimals = [1.5m, -99.99m, 0m];
+
+        var message = new TestMessageMapped { SingleGuid = Guid4, SingleDecimal = Decimal1, ListOfDecimal = { decimals } };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessageMapped.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(3, deserializedMessage.ListOfDecimal.Count);
+        Assert.AreEqual(1.5m, deserializedMessage.ListOfDecimal[0]);
+        Assert.AreEqual(-99.99m, deserializedMessage.ListOfDecimal[1]);
+        Assert.AreEqual(0m, deserializedMessage.ListOfDecimal[2]);
+        Assert.IsTrue(message.ListOfDecimal.SequenceEqual(deserializedMessage.ListOfDecimal));
+    }
+
+    [TestMethod]
+    public void TestRepeatedDecimalUnmappedToMapped()
+    {
+        var message = new TestMessage { SingleGuid = Guid4.ToString(), SingleDecimal = Decimal1.ToString(CultureInfo.InvariantCulture), ListOfDecimal = { "1.5", "-99.99", "0" } };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessageMapped.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(3, deserializedMessage.ListOfDecimal.Count);
+        Assert.AreEqual(1.5m, deserializedMessage.ListOfDecimal[0]);
+        Assert.AreEqual(-99.99m, deserializedMessage.ListOfDecimal[1]);
+        Assert.AreEqual(0m, deserializedMessage.ListOfDecimal[2]);
+    }
+
+    [TestMethod]
     public void TestWithNull()
     {
         Guid[] guids = [Guid1, Guid2, Guid3];

@@ -12,6 +12,7 @@ message TestMessage {
   repeated string list_of_guid = 5;
   string single_decimal = 8;
   google.protobuf.StringValue single_nullable_decimal = 9;
+  repeated string list_of_decimal = 10;
 }
 
 message TestMessageMapped {
@@ -37,6 +38,9 @@ message TestMessageMapped {
 
   // [Decimal]
   google.protobuf.StringValue single_nullable_decimal = 9;
+
+  // [Decimal]
+  repeated string list_of_decimal = 10;
 }
 
 //////////////////////////////////////////////

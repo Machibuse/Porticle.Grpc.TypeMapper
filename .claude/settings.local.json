@@ -8,7 +8,12 @@
       "Bash(dir:*)",
       "Bash(findstr:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:reese.codes)"
+      "WebFetch(domain:reese.codes)",
+      "Bash(dotnet msbuild:*)",
+      "Bash(cmd.exe /c \"taskkill /PID 9504 /F\")",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(dotnet build-server:*)"
     ]
   }
 }
