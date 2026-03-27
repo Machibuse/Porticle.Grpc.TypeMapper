@@ -7,6 +7,7 @@
         <Nullable>enable</Nullable>
         <Configurations>Debug;Release;Test</Configurations>
         <Platforms>AnyCPU</Platforms>
+        <PorticleGrpcTypeMapper_WrapAllNonNullableStrings>true</PorticleGrpcTypeMapper_WrapAllNonNullableStrings>
     </PropertyGroup>
 
     <ItemGroup>

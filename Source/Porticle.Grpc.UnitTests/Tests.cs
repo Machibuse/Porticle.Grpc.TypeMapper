@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Reflection;
 using Google.Protobuf;
 
 namespace Porticle.Grpc.UnitTests;
@@ -373,6 +374,45 @@ public sealed class Tests
         Assert.AreEqual("hello", deserialized.RequiredString);
         Assert.AreEqual("world", deserialized.NullableString);
         Assert.IsNotNull(deserialized.SubMessage);
+    }
+
+    [TestMethod]
+    public void TestNullableReferenceTypesPropertyTypes()
+    {
+        var type = typeof(TestMessageNullableRef);
+        var nullabilityContext = new NullabilityInfoContext();
+
+        // RequiredString (proto string) must be non-nullable string in nullable context
+        var requiredString = type.GetProperty("RequiredString")!;
+        var requiredStringNullability = nullabilityContext.Create(requiredString);
+        Assert.AreEqual(typeof(string), requiredString.PropertyType);
+        Assert.AreEqual(NullabilityState.NotNull, requiredStringNullability.ReadState);
+
+        // NullableString (proto StringValue) must be nullable string?
+        var nullableString = type.GetProperty("NullableString")!;
+        var nullableStringNullability = nullabilityContext.Create(nullableString);
+        Assert.AreEqual(typeof(string), nullableString.PropertyType);
+        Assert.AreEqual(NullabilityState.Nullable, nullableStringNullability.ReadState);
+
+        // SubMessage (proto message) must be nullable TypeName?
+        var subMessage = type.GetProperty("SubMessage")!;
+        var subMessageNullability = nullabilityContext.Create(subMessage);
+        Assert.AreEqual(typeof(TestMessageEnum1), subMessage.PropertyType);
+        Assert.AreEqual(NullabilityState.Nullable, subMessageNullability.ReadState);
+
+        // EnumRequired must NOT be nullable
+        var enumRequired = type.GetProperty("EnumRequired")!;
+        Assert.AreEqual(typeof(TestEnum), enumRequired.PropertyType);
+        Assert.IsFalse(Nullable.GetUnderlyingType(enumRequired.PropertyType) != null);
+
+        // Scalar types must NOT be nullable
+        Assert.AreEqual(typeof(int), type.GetProperty("SomeInt")!.PropertyType);
+        Assert.AreEqual(typeof(long), type.GetProperty("SomeLong")!.PropertyType);
+        Assert.AreEqual(typeof(double), type.GetProperty("SomeDouble")!.PropertyType);
+        Assert.AreEqual(typeof(float), type.GetProperty("SomeFloat")!.PropertyType);
+        Assert.AreEqual(typeof(bool), type.GetProperty("SomeBool")!.PropertyType);
+        Assert.AreEqual(typeof(uint), type.GetProperty("SomeUint")!.PropertyType);
+        Assert.AreEqual(typeof(ulong), type.GetProperty("SomeUlong")!.PropertyType);
     }
 
     private static void TestOptionalEnum(FooBarMessage messageIn, FooBar? result, bool hasEnum)

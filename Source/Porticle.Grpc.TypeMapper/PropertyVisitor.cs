@@ -30,9 +30,16 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
             if (property.GetLeadingTrivia().ToFullString().Contains("[Decimal]")) return ConvertToDecimalProperty(property);
 
             if (wrapAllNullableStringValues || property.GetLeadingTrivia().ToFullString().Contains("[NullableString]"))
-                return ConvertToNullableStringProperty(property, wrapAllNullableStringValues);
+            {
+                var result = ConvertToNullableStringProperty(property, wrapAllNullableStringValues);
+                if (result != null || !nullableReferenceTypes) return result;
+            }
 
-            if (wrapAllNonNullableStrings) return ConvertToNonNullableStringProperty(property);
+            if (wrapAllNonNullableStrings)
+            {
+                var result = ConvertToNonNullableStringProperty(property);
+                if (result != null || !nullableReferenceTypes) return result;
+            }
 
             if (nullableReferenceTypes)
             {
