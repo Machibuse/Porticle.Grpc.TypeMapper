@@ -331,6 +331,50 @@ public sealed class Tests
         TestOptionalEnum(message, null, false);
     }
 
+    [TestMethod]
+    public void TestNullableReferenceTypesWithNull()
+    {
+        var message = new TestMessageNullableRef { RequiredString = "hello", NullableString = null, SubMessage = null };
+
+        var byteArray = message.ToByteArray();
+
+        var deserialized = TestMessageNullableRef.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual("hello", deserialized.RequiredString);
+        Assert.IsNull(deserialized.NullableString);
+        Assert.IsNull(deserialized.SubMessage);
+    }
+
+    [TestMethod]
+    public void TestNullableReferenceTypesWithValues()
+    {
+        var subMessage = new TestMessageEnum1();
+        var message = new TestMessageNullableRef { RequiredString = "hello", NullableString = "world", SubMessage = subMessage };
+
+        var byteArray = message.ToByteArray();
+
+        var deserialized = TestMessageNullableRef.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual("hello", deserialized.RequiredString);
+        Assert.AreEqual("world", deserialized.NullableString);
+        Assert.IsNotNull(deserialized.SubMessage);
+    }
+
+    [TestMethod]
+    public void TestNullableReferenceTypesUnmappedToMapped()
+    {
+        var subMessage = new TestMessageEnum1();
+        var message = new TestMessageNullableRefUnmapped { RequiredString = "hello", NullableString = "world", SubMessage = subMessage };
+
+        var byteArray = message.ToByteArray();
+
+        var deserialized = TestMessageNullableRef.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual("hello", deserialized.RequiredString);
+        Assert.AreEqual("world", deserialized.NullableString);
+        Assert.IsNotNull(deserialized.SubMessage);
+    }
+
     private static void TestOptionalEnum(FooBarMessage messageIn, FooBar? result, bool hasEnum)
     {
         var messageOut = FooBarMessage.Parser.ParseFrom(messageIn.ToByteArray());

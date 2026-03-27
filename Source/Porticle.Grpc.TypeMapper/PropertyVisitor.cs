@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Porticle.Grpc.TypeMapper;
 
-public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings, bool wrapAllNullableStringValues) : CSharpSyntaxRewriter
+public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings, bool wrapAllNullableStringValues, bool nullableReferenceTypes = false) : CSharpSyntaxRewriter
 {
     public HashSet<PropertyToField> ReplaceProps = new();
 
@@ -33,6 +33,16 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
                 return ConvertToNullableStringProperty(property, wrapAllNullableStringValues);
 
             if (wrapAllNonNullableStrings) return ConvertToNonNullableStringProperty(property);
+
+            if (nullableReferenceTypes)
+            {
+                var setter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.SetAccessorDeclaration));
+                if (setter?.Body != null)
+                {
+                    var isNullable = !setter.Body.ToFullString().Contains("ProtoPreconditions.CheckNotNull");
+                    return isNullable ? ConvertToNullableStringProperty(property, false) : ConvertToNonNullableStringProperty(property);
+                }
+            }
 
             return null;
         }
@@ -106,6 +116,7 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
         if (property.GetLeadingTrivia().ToFullString().Contains("[NullableEnum]")) return ConvertOptionalToNullableEnum(property);
 
+        if (nullableReferenceTypes) return ConvertToNullableMessageProperty(property);
 
         // dont change anything
         return null;
@@ -217,6 +228,42 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
         var trailingTrivia = SyntaxFactory.TriviaList(SyntaxFactory.ElasticCarriageReturnLineFeed, disableDirective);
 
         return property.WithLeadingTrivia(leadingTrivia.AddRange(property.GetLeadingTrivia())).WithTrailingTrivia(property.GetTrailingTrivia().AddRange(trailingTrivia));
+    }
+
+    private PropertyDeclarationSyntax? ConvertToNullableMessageProperty(PropertyDeclarationSyntax property)
+    {
+        // Only transform fully qualified types (message references use global::Namespace.TypeName)
+        var propertyType = property.Type.ToString().TrimEnd();
+        if (!propertyType.StartsWith("global::")) return null;
+
+        var setter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.SetAccessorDeclaration));
+        if (setter?.Body == null) return null;
+
+        // Optional enums/fields use _hasBits in their setter — skip those
+        if (setter.Body.ToFullString().Contains("_hasBits")) return null;
+
+        // Find backing field in the containing class to distinguish required enums from messages
+        var getter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.GetAccessorDeclaration));
+        var returnStatement = getter?.Body?.Statements.OfType<ReturnStatementSyntax>().FirstOrDefault();
+        if (returnStatement?.Expression is not IdentifierNameSyntax fieldIdentifier) return null;
+
+        var containingClass = property.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+        var backingField = containingClass?.Members.OfType<FieldDeclarationSyntax>().SelectMany(f => f.Declaration.Variables)
+            .FirstOrDefault(v => v.Identifier.Text == fieldIdentifier.Identifier.Text);
+
+        // Required enums have an initializer (e.g. = global::X.TestEnum.Foo) — skip those
+        if (backingField?.Initializer != null) return null;
+
+        var enableDirective =
+            SyntaxFactory.Trivia(SyntaxFactory.NullableDirectiveTrivia(SyntaxFactory.Token(SyntaxKind.EnableKeyword).WithLeadingTrivia(SyntaxFactory.Space), true));
+        var disableDirective =
+            SyntaxFactory.Trivia(SyntaxFactory.NullableDirectiveTrivia(SyntaxFactory.Token(SyntaxKind.DisableKeyword).WithLeadingTrivia(SyntaxFactory.Space), true));
+
+        var leadingTrivia = SyntaxFactory.TriviaList(enableDirective, SyntaxFactory.ElasticCarriageReturnLineFeed);
+        var trailingTrivia = SyntaxFactory.TriviaList(SyntaxFactory.ElasticCarriageReturnLineFeed, disableDirective);
+
+        return property.WithType(SyntaxFactory.NullableType(property.Type.WithoutTrivia()).WithTrailingTrivia(SyntaxFactory.ElasticSpace))
+            .WithLeadingTrivia(leadingTrivia.AddRange(property.GetLeadingTrivia())).WithTrailingTrivia(property.GetTrailingTrivia().AddRange(trailingTrivia));
     }
 
     private PropertyDeclarationSyntax? ConvertToGuidProperty(PropertyDeclarationSyntax property)

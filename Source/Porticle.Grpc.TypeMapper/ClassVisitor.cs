@@ -20,7 +20,9 @@ public class ClassVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings,
         var trivia = node.GetLeadingTrivia().Add(SyntaxFactory.Comment("/// <remark>" + marker + "</remark>")).Add(SyntaxFactory.CarriageReturnLineFeed);
         node = node.WithLeadingTrivia(trivia);
 
-        var propertyVisitor = new PropertyVisitor(log, wrapAllNonNullableStrings, wrapAllNullableStringValues);
+        var nullableReferenceTypes = node.GetLeadingTrivia().ToFullString().Contains("[NullableReferenceTypes]");
+
+        var propertyVisitor = new PropertyVisitor(log, wrapAllNonNullableStrings, wrapAllNullableStringValues, nullableReferenceTypes);
         node = (ClassDeclarationSyntax)propertyVisitor.Visit(node);
 
         if (propertyVisitor.NeedGuidConverter)

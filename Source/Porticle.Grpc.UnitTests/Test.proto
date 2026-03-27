@@ -61,6 +61,37 @@ message TestMessageEnum3 {
 }
 
 
+// [NullableReferenceTypes]
+message TestMessageNullableRef {
+  string required_string = 1;
+  google.protobuf.StringValue nullable_string = 2;
+  TestMessageEnum1 sub_message = 3;
+  TestEnum enum_required = 4;
+  optional TestEnum enum_optional = 5;
+  int32 some_int = 6;
+  int64 some_long = 7;
+  uint32 some_uint = 8;
+  uint64 some_ulong = 9;
+  double some_double = 10;
+  float some_float = 11;
+  bool some_bool = 12;
+  bytes some_bytes = 13;
+  sint32 some_sint = 14;
+  sint64 some_slong = 15;
+  fixed32 some_fixed32 = 16;
+  fixed64 some_fixed64 = 17;
+  sfixed32 some_sfixed32 = 18;
+  sfixed64 some_sfixed64 = 19;
+  repeated string some_repeated_string = 20;
+  map<string, string> some_map = 21;
+}
+
+message TestMessageNullableRefUnmapped {
+  string required_string = 1;
+  google.protobuf.StringValue nullable_string = 2;
+  TestMessageEnum1 sub_message = 3;
+}
+
 enum TestEnum
 {
   FOO = 0;
