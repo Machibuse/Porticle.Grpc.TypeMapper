@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Reflection;
 using Google.Protobuf;
+using Google.Protobuf.WellKnownTypes;
 
 namespace Porticle.Grpc.UnitTests;
 
@@ -15,6 +16,9 @@ public sealed class Tests
 
     private static readonly decimal Decimal1 = 12345.6789m;
     private static readonly decimal Decimal2 = -99999.00001m;
+
+    private static readonly DateTime UtcDateTime1 = new DateTime(2024, 5, 17, 13, 45, 30, 123, DateTimeKind.Utc).AddTicks(4567);
+    private static readonly DateTimeOffset DateTimeOffset1 = new DateTimeOffset(2024, 5, 17, 13, 45, 30, 123, TimeSpan.FromHours(2)).AddTicks(4567);
 
     [TestMethod]
     public void TestDecimalWithNull()
@@ -104,6 +108,72 @@ public sealed class Tests
         Assert.AreEqual(1.5m, deserializedMessage.ListOfDecimal[0]);
         Assert.AreEqual(-99.99m, deserializedMessage.ListOfDecimal[1]);
         Assert.AreEqual(0m, deserializedMessage.ListOfDecimal[2]);
+    }
+
+    [TestMethod]
+    public void TestDateTimeRoundtrip()
+    {
+        var message = new TestMessageMapped { SingleDateTime = UtcDateTime1, SingleDateTimeOffset = DateTimeOffset1 };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessageMapped.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(UtcDateTime1, deserializedMessage.SingleDateTime);
+        Assert.AreEqual(DateTimeKind.Utc, deserializedMessage.SingleDateTime!.Value.Kind);
+
+        // DateTimeOffset equality compares the instant - the original offset is not preserved, Timestamp always returns UTC (offset zero)
+        Assert.AreEqual(DateTimeOffset1, deserializedMessage.SingleDateTimeOffset);
+        Assert.AreEqual(TimeSpan.Zero, deserializedMessage.SingleDateTimeOffset!.Value.Offset);
+    }
+
+    [TestMethod]
+    public void TestDateTimeWithNull()
+    {
+        var message = new TestMessageMapped { SingleDateTime = null, SingleDateTimeOffset = null };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessageMapped.Parser.ParseFrom(byteArray);
+
+        Assert.IsNull(deserializedMessage.SingleDateTime);
+        Assert.IsNull(deserializedMessage.SingleDateTimeOffset);
+    }
+
+    [TestMethod]
+    public void TestDateTimeLocalThrows()
+    {
+        var message = new TestMessageMapped();
+
+        // Timestamp.FromDateTime only accepts DateTimeKind.Utc
+        Assert.ThrowsException<ArgumentException>(() => message.SingleDateTime = DateTime.SpecifyKind(UtcDateTime1, DateTimeKind.Local));
+        Assert.ThrowsException<ArgumentException>(() => message.SingleDateTime = DateTime.SpecifyKind(UtcDateTime1, DateTimeKind.Unspecified));
+    }
+
+    [TestMethod]
+    public void TestDateTimeUnmappedToMapped()
+    {
+        var message = new TestMessage { SingleDateTime = Timestamp.FromDateTime(UtcDateTime1), SingleDateTimeOffset = Timestamp.FromDateTimeOffset(DateTimeOffset1) };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessageMapped.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(UtcDateTime1, deserializedMessage.SingleDateTime);
+        Assert.AreEqual(DateTimeOffset1, deserializedMessage.SingleDateTimeOffset);
+    }
+
+    [TestMethod]
+    public void TestDateTimeMappedToUnmapped()
+    {
+        var message = new TestMessageMapped { SingleDateTime = UtcDateTime1, SingleDateTimeOffset = DateTimeOffset1 };
+
+        var byteArray = message.ToByteArray();
+
+        var deserializedMessage = TestMessage.Parser.ParseFrom(byteArray);
+
+        Assert.AreEqual(Timestamp.FromDateTime(UtcDateTime1), deserializedMessage.SingleDateTime);
+        Assert.AreEqual(Timestamp.FromDateTimeOffset(DateTimeOffset1), deserializedMessage.SingleDateTimeOffset);
     }
 
     [TestMethod]

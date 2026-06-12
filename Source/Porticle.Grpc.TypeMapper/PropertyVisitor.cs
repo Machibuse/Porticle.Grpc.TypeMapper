@@ -121,6 +121,13 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
             return null;
         }
 
+        if (property.Type.ToString() == "global::Google.Protobuf.WellKnownTypes.Timestamp")
+        {
+            if (property.GetLeadingTrivia().ToFullString().Contains("[DateTimeOffset]")) return ConvertToTimestampProperty(property, true);
+
+            if (property.GetLeadingTrivia().ToFullString().Contains("[DateTime]")) return ConvertToTimestampProperty(property, false);
+        }
+
         if (property.GetLeadingTrivia().ToFullString().Contains("[NullableEnum]")) return ConvertOptionalToNullableEnum(property);
 
         if (nullableReferenceTypes) return ConvertToNullableMessageProperty(property);
@@ -482,6 +489,83 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
         }
 
         return property;
+    }
+
+    /// <summary>
+    ///     Converts a google.protobuf.Timestamp property to DateTime? or DateTimeOffset? using the
+    ///     conversion methods provided by Google.Protobuf (Timestamp.FromDateTime/ToDateTime and
+    ///     Timestamp.FromDateTimeOffset/ToDateTimeOffset). Timestamp.FromDateTime throws an
+    ///     ArgumentException when the assigned DateTime is not of kind Utc (e.g. Local).
+    /// </summary>
+    private PropertyDeclarationSyntax? ConvertToTimestampProperty(PropertyDeclarationSyntax property, bool asDateTimeOffset)
+    {
+        var targetType = asDateTimeOffset ? "global::System.DateTimeOffset" : "global::System.DateTime";
+        var fromMethod = asDateTimeOffset ? "FromDateTimeOffset" : "FromDateTime";
+        var toMethod = asDateTimeOffset ? "ToDateTimeOffset" : "ToDateTime";
+
+        var setter = property.GetSetter();
+
+        if (setter.Body == null)
+        {
+            log.LogError($"No setter found in property {property.Identifier}");
+            return null;
+        }
+
+        // Manipulate setter - message fields are always nullable, so null must be passed through
+        var assignment = GetAssignmentExpression(setter);
+
+        var newRightHandSide = SyntaxFactory.ParseExpression($"value == null ? null : global::Google.Protobuf.WellKnownTypes.Timestamp.{fromMethod}(value.Value)");
+
+        var newSetter = setter.ReplaceNode(assignment, assignment.WithRight(newRightHandSide));
+
+        property = property.ReplaceNode(setter, newSetter);
+
+        // Manipulate getter
+        var getter = property.GetGetter();
+
+        if (getter?.Body == null)
+        {
+            log.LogError($"No getter found in property {property.Identifier}");
+            return null;
+        }
+
+        var returnStatement = getter.Body?.Statements.OfType<ReturnStatementSyntax>().FirstOrDefault();
+
+        if (returnStatement?.Expression == null)
+        {
+            log.LogError($"Getter has no valid return statement in property {property.Identifier}");
+            return null;
+        }
+
+        var originalReturnExpression = returnStatement.Expression;
+
+        if (originalReturnExpression is not IdentifierNameSyntax identifierNameSyntax)
+        {
+            log.LogError($"Getter return statement should be a simple identifier in property {property.Identifier}");
+            return null;
+        }
+
+        ReplaceProps.Add(new PropertyToField(property.Identifier.ValueText, identifierNameSyntax.Identifier.ValueText));
+
+        var newReturnExpression = SyntaxFactory.InvocationExpression(SyntaxFactory.MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, originalReturnExpression,
+            SyntaxFactory.IdentifierName(toMethod)));
+
+        var newReturnStatement = returnStatement.WithExpression(newReturnExpression).WithTrailingTrivia(SyntaxFactory.Space);
+
+        // Statement: if (field == null) return default;
+        var ifStatement = SyntaxFactory.IfStatement(
+                SyntaxFactory.BinaryExpression(SyntaxKind.EqualsExpression, originalReturnExpression, SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression)),
+                SyntaxFactory.ReturnStatement(SyntaxFactory.LiteralExpression(SyntaxKind.DefaultLiteralExpression).WithLeadingTrivia(SyntaxFactory.Space)))
+            .WithTrailingTrivia(SyntaxFactory.Space);
+
+        var newGetterBody = SyntaxFactory.Block(ifStatement, newReturnStatement);
+
+        var newGetter = getter.WithBody(newGetterBody.WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed));
+
+        property = property.ReplaceNode(getter, newGetter);
+
+        // Change the type of the property - always nullable because message fields can be null
+        return property.WithType(SyntaxFactory.ParseTypeName(targetType + "?").WithTrailingTrivia(SyntaxFactory.Space));
     }
 
     private static AssignmentExpressionSyntax GetAssignmentExpression(AccessorDeclarationSyntax setter)

@@ -4,7 +4,7 @@
 
 Porticle.Grpc.TypeMapper is a Roslyn-based post-processor shipped as a NuGet development dependency. It hooks into the build pipeline after `Protobuf_Compile` and rewrites protoc-generated C# classes to add support for Guids, decimals, nullable strings, and nullable enums — features not natively supported by Protocol Buffers.
 
-Proto field comments (`[GrpcGuid]`, `[Decimal]`, `[NullableString]`, `[NullableEnum]`) or global project properties control which transformations are applied.
+Proto field comments (`[GrpcGuid]`, `[Decimal]`, `[DateTime]`, `[DateTimeOffset]`, `[NullableString]`, `[NullableEnum]`) or global project properties control which transformations are applied.
 
 ## Solution Structure
 

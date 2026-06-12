@@ -3,6 +3,7 @@
 option csharp_namespace = "Porticle.Grpc.UnitTests";
 
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/timestamp.proto";
 
 
 message TestMessage {
@@ -13,6 +14,8 @@ message TestMessage {
   string single_decimal = 8;
   google.protobuf.StringValue single_nullable_decimal = 9;
   repeated string list_of_decimal = 10;
+  google.protobuf.Timestamp single_date_time = 11;
+  google.protobuf.Timestamp single_date_time_offset = 12;
 }
 
 message TestMessageMapped {
@@ -41,6 +44,12 @@ message TestMessageMapped {
 
   // [Decimal]
   repeated string list_of_decimal = 10;
+
+  // [DateTime]
+  google.protobuf.Timestamp single_date_time = 11;
+
+  // [DateTimeOffset]
+  google.protobuf.Timestamp single_date_time_offset = 12;
 }
 
 //////////////////////////////////////////////

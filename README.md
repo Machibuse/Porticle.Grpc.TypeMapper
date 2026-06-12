@@ -1,6 +1,7 @@
 # Porticle.Grpc.TypeMapper
 
-A Roslyn-based post-processor for protoc-generated files that adds automatic mappings for `Guid`, `Guid?`, `decimal`, `decimal?`, `string?`, nullable enums and nullable reference
+A Roslyn-based post-processor for protoc-generated files that adds automatic mappings for `Guid`, `Guid?`, `decimal`, `decimal?`, `DateTime?`, `DateTimeOffset?`, `string?`,
+nullable enums and nullable reference
 types. By simply adding this
 package and adding
 comments to
@@ -22,6 +23,8 @@ This library adds automatic conversion for:
 - Protobuf google.Protobuf.StringValue to C# Guid?
 - Protobuf string to C# decimal
 - Protobuf google.Protobuf.StringValue to C# decimal?
+- Protobuf google.protobuf.Timestamp to C# DateTime?
+- Protobuf google.protobuf.Timestamp to C# DateTimeOffset?
 - Protobuf google.Protobuf.StringValue to C# string?
 - Protobuf optional enum to C# nullable enum
 - Full nullable reference type support per message via `[NullableReferenceTypes]`
@@ -34,6 +37,8 @@ Code.
 
 - Add `// [GrpcGuid]` as comment to a string or StringValue proto field to get Guid/Guid? in generated c# code
 - Add `// [Decimal]` as comment to a string or StringValue proto field to get decimal/decimal? in generated c# code
+- Add `// [DateTime]` as comment to a google.protobuf.Timestamp proto field to get DateTime? in generated c# code (UTC only - assigning a non-UTC DateTime throws)
+- Add `// [DateTimeOffset]` as comment to a google.protobuf.Timestamp proto field to get DateTimeOffset? in generated c# code
 - Add `// [NullableString]` as comment to a string or StringValue proto field to get string? in generated c# code
 - Add `// [NullableEnum]` as comment to an optional enum proto field to get MyEnum? in generated c# code
 - Add `// [NullableReferenceTypes]` as comment above a message to wrap all reference type properties with `#nullable enable/disable` and make nullable ones `string?` / `TypeName?`
@@ -74,6 +79,8 @@ There are several things you can do in your .proto files:
 - Add `// [GrpcGuid]` as comment to a StringValue field - Converts the corresponding c# string property to Guid?
 - Add `// [Decimal]` as comment to a string field - Converts the corresponding c# string property to decimal
 - Add `// [Decimal]` as comment to a StringValue field - Converts the corresponding c# string property to decimal?
+- Add `// [DateTime]` as comment to a google.protobuf.Timestamp field - Converts the corresponding c# Timestamp property to DateTime?
+- Add `// [DateTimeOffset]` as comment to a google.protobuf.Timestamp field - Converts the corresponding c# Timestamp property to DateTimeOffset?
 - Add `// [NullableString]` as comment to a StringValue field - Converts the corresponding c# string property to string?
 - Add `// [NullableEnum]` as comment to a optional enum field - Converts the corresponding optional proto enum to a C# nullable Enum
 - Add `// [NullableReferenceTypes]` as comment above a message definition - Enables full nullable reference type support for the entire message (see below)
@@ -280,6 +287,59 @@ public global::Porticle.Grpc.UnitTests.TestEnum? FooBar {
 		_hasBits0 |= 1;
 		fooBar_ = value.Value;
 	} 
+  }
+}
+```
+
+## `[DateTime]` / `[DateTimeOffset]` - Mapping google.protobuf.Timestamp
+
+Add `// [DateTime]` or `// [DateTimeOffset]` as comment to a `google.protobuf.Timestamp` field to get a `DateTime?` or `DateTimeOffset?` property in the generated C# code.
+Since message fields are always optional in proto3, the resulting property is always nullable.
+
+The conversion uses the original functions provided by Google.Protobuf: `Timestamp.FromDateTime`/`ToDateTime` and `Timestamp.FromDateTimeOffset`/`ToDateTimeOffset`.
+
+**Note:** `Timestamp.FromDateTime` only accepts `DateTime` values with `DateTimeKind.Utc`. Assigning a `DateTime` with kind `Local` or `Unspecified` throws an `ArgumentException`.
+`DateTimeOffset` values can have any offset - they are converted to UTC internally, so reading the property back always returns offset zero.
+
+```protobuf
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+message Order {
+  // [DateTime] Creation time (UTC)
+  google.protobuf.Timestamp created_at = 1;
+
+  // [DateTimeOffset] Delivery time
+  google.protobuf.Timestamp delivered_at = 2;
+}
+```
+
+Will result in generated code like this:
+
+```csharp
+/// <summary>[DateTime] Creation time (UTC)</summary>
+public global::System.DateTime? CreatedAt {
+  get {
+      // return null when the underlying Timestamp is null
+      if (createdAt_ == null) return default;
+      // convert using the original Google.Protobuf function
+      return createdAt_.ToDateTime();
+  }
+  set {
+      // Timestamp.FromDateTime throws an ArgumentException when value.Kind is not Utc
+      createdAt_ = value == null ? null : global::Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(value.Value);
+  }
+}
+
+/// <summary>[DateTimeOffset] Delivery time</summary>
+public global::System.DateTimeOffset? DeliveredAt {
+  get {
+      if (deliveredAt_ == null) return default;
+      return deliveredAt_.ToDateTimeOffset();
+  }
+  set {
+      deliveredAt_ = value == null ? null : global::Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(value.Value);
   }
 }
 ```
