@@ -11,7 +11,7 @@ Proto field comments (`[GrpcGuid]`, `[Decimal]`, `[DateTime]`, `[DateTimeOffset]
 ```
 Source/
   Porticle.Grpc.sln
-  Porticle.Grpc.TypeMapper/     # Main library (NuGet package, net8.0 + net9.0)
+  Porticle.Grpc.TypeMapper/     # Main library (NuGet package, net8.0, net9.0, net10.0)
   Porticle.Grpc.UnitTests/      # MSTest unit tests (net9.0)
   Porticle.Grpc.Test/            # Integration test with proto files
   Porticle.Grpc.TestWithoutProto/ # Package consumption test without proto compilation
@@ -44,7 +44,7 @@ Use the **Test** solution configuration (`-c Test`) when running tests. This avo
 ## Coding Conventions
 
 - All code comments (including XML doc comments) must be written in **English**.
-- Target frameworks: net8.0 and net9.0.
+- Target frameworks: net8.0, net9.0 and net10.0.
 - Nullable reference types are enabled (`<Nullable>enable</Nullable>`).
 - Implicit usings are enabled.
 - Debug builds treat warnings as errors.
