@@ -485,6 +485,114 @@ public sealed class Tests
         Assert.AreEqual(typeof(ulong), type.GetProperty("SomeUlong")!.PropertyType);
     }
 
+    [TestMethod]
+    public void TestGuidOneofRoundTrip()
+    {
+        var message = new TestMessageMappedGuidOneof { Guid = Guid4 };
+
+        var deserialized = TestMessageMappedGuidOneof.Parser.ParseFrom(message.ToByteArray());
+
+        Assert.AreEqual(TestMessageMappedGuidOneof.IdentifierOneofCase.Guid, deserialized.IdentifierCase);
+        Assert.AreEqual(Guid4, deserialized.Guid);
+        Assert.AreEqual(message, deserialized);
+    }
+
+    [TestMethod]
+    public void TestGuidOneofWireCompatibility()
+    {
+        var unmapped = new TestMessageGuidOneof { Guid = Guid4.ToString() };
+
+        var mapped = TestMessageMappedGuidOneof.Parser.ParseFrom(unmapped.ToByteArray());
+        var roundTripped = TestMessageGuidOneof.Parser.ParseFrom(mapped.ToByteArray());
+
+        Assert.AreEqual(Guid4, mapped.Guid);
+        Assert.AreEqual(Guid4.ToString(), roundTripped.Guid);
+    }
+
+    [TestMethod]
+    public void TestGuidOneofStateTransitions()
+    {
+        var message = new TestMessageMappedGuidOneof();
+
+        Assert.AreEqual(Guid.Empty, message.Guid);
+        Assert.AreEqual(TestMessageMappedGuidOneof.IdentifierOneofCase.None, message.IdentifierCase);
+
+        message.Guid = Guid4;
+        message.Text = "text";
+
+        Assert.IsFalse(message.HasGuid);
+        Assert.IsTrue(message.HasText);
+        Assert.AreEqual(Guid.Empty, message.Guid);
+        message.ClearGuid();
+        Assert.AreEqual(TestMessageMappedGuidOneof.IdentifierOneofCase.Text, message.IdentifierCase);
+
+        message.ClearIdentifier();
+        Assert.AreEqual(TestMessageMappedGuidOneof.IdentifierOneofCase.None, message.IdentifierCase);
+    }
+
+    [TestMethod]
+    public void TestGuidOneofMergeAndHashCode()
+    {
+        var rawGuid = Guid4.ToString("N").ToUpperInvariant();
+        var unmapped = new TestMessageGuidOneof { Guid = rawGuid };
+        var source = TestMessageMappedGuidOneof.Parser.ParseFrom(unmapped.ToByteArray());
+        var destination = new TestMessageMappedGuidOneof { Text = "text" };
+
+        destination.MergeFrom(source);
+
+        Assert.AreEqual(TestMessageMappedGuidOneof.IdentifierOneofCase.Guid, destination.IdentifierCase);
+        Assert.AreEqual(source, destination);
+        Assert.AreEqual(unmapped.GetHashCode(), destination.GetHashCode());
+        CollectionAssert.AreEqual(source.ToByteArray(), destination.ToByteArray());
+    }
+
+    [TestMethod]
+    public void TestGuidOneofClonePreservesWireValue()
+    {
+        var rawGuid = Guid4.ToString("N").ToUpperInvariant();
+        var unmapped = new TestMessageGuidOneof { Guid = rawGuid };
+        var mapped = TestMessageMappedGuidOneof.Parser.ParseFrom(unmapped.ToByteArray());
+
+        var clone = mapped.Clone();
+
+        Assert.AreEqual(mapped, clone);
+        CollectionAssert.AreEqual(mapped.ToByteArray(), clone.ToByteArray());
+    }
+
+    [TestMethod]
+    public void TestNestedGuidOneofRoundTrip()
+    {
+        var message = new TestMessageWithNestedGuidOneof
+        {
+            Nested = new TestMessageWithNestedGuidOneof.Types.NestedMappedGuidOneof
+            {
+                Guid = Guid4,
+            },
+        };
+
+        var deserialized = TestMessageWithNestedGuidOneof.Parser.ParseFrom(message.ToByteArray());
+
+        Assert.AreEqual(Guid4, deserialized.Nested.Guid);
+    }
+
+    [TestMethod]
+    public void TestGuidOneofNestedNameCollisionRoundTrip()
+    {
+        var message = new TestMessageGuidOneofWithNestedCollision
+        {
+            Guid = Guid4,
+            Nested = new TestMessageGuidOneofWithNestedCollision.Types.NestedUnmappedGuidOneof
+            {
+                Guid = Guid5.ToString(),
+            },
+        };
+
+        var deserialized = TestMessageGuidOneofWithNestedCollision.Parser.ParseFrom(message.ToByteArray());
+
+        Assert.AreEqual(Guid4, deserialized.Guid);
+        Assert.AreEqual(Guid5.ToString(), deserialized.Nested.Guid);
+    }
+
     private static void TestOptionalEnum(FooBarMessage messageIn, FooBar? result, bool hasEnum)
     {
         var messageOut = FooBarMessage.Parser.ParseFrom(messageIn.ToByteArray());

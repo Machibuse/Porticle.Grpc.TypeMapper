@@ -17,12 +17,24 @@ public class MethodVisitor : CSharpSyntaxRewriter
         "InternalMergeFrom"
     ];
 
+    private int classDepth;
+
     public MethodVisitor(HashSet<PropertyToField> replaceProps)
     {
         ReplaceProps = replaceProps;
     }
 
     public HashSet<PropertyToField> ReplaceProps { get; }
+
+    public override SyntaxNode? VisitClassDeclaration(ClassDeclarationSyntax node)
+    {
+        if (classDepth > 0) return node;
+
+        classDepth++;
+        var rewrittenClass = base.VisitClassDeclaration(node);
+        classDepth--;
+        return rewrittenClass;
+    }
 
     public override SyntaxNode? VisitMethodDeclaration(MethodDeclarationSyntax node)
     {
@@ -35,5 +47,15 @@ public class MethodVisitor : CSharpSyntaxRewriter
         if (newBody == null) return base.VisitMethodDeclaration(node);
 
         return node.WithBody(newBody);
+    }
+
+    public override SyntaxNode? VisitConstructorDeclaration(ConstructorDeclarationSyntax node)
+    {
+        var propertyToFieldRewriter = new PropertyToFieldRewriter(ReplaceProps);
+        var newBody = (BlockSyntax?)propertyToFieldRewriter.Visit(node.Body);
+
+        return newBody == null
+            ? base.VisitConstructorDeclaration(node)
+            : node.WithBody(newBody);
     }
 }
