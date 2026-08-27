@@ -36,6 +36,7 @@ Code.
 ## TL/DR
 
 - Add `// [GrpcGuid]` as comment to a string or StringValue proto field to get Guid/Guid? in generated c# code
+- `[GrpcGuid]` also supports scalar string fields inside a `oneof` without changing their protobuf wire encoding
 - Add `// [Decimal]` as comment to a string or StringValue proto field to get decimal/decimal? in generated c# code
 - Add `// [DateTime]` as comment to a google.protobuf.Timestamp proto field to get DateTime? in generated c# code (UTC only - assigning a non-UTC DateTime throws)
 - Add `// [DateTimeOffset]` as comment to a google.protobuf.Timestamp proto field to get DateTimeOffset? in generated c# code
@@ -76,6 +77,7 @@ Don't wonder ist you cant se it in your csproj file. It is dynamically added whe
 There are several things you can do in your .proto files:
 
 - Add `// [GrpcGuid]` as comment to a string field - Converts the corresponding c# string property to Guid
+- `// [GrpcGuid]` on a string field inside a `oneof` keeps the generated oneof case semantics while exposing the property as `Guid`
 - Add `// [GrpcGuid]` as comment to a StringValue field - Converts the corresponding c# string property to Guid?
 - Add `// [Decimal]` as comment to a string field - Converts the corresponding c# string property to decimal
 - Add `// [Decimal]` as comment to a StringValue field - Converts the corresponding c# string property to decimal?

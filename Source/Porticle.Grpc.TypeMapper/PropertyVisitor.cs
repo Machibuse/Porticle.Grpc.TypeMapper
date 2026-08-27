@@ -9,10 +9,28 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 {
     public HashSet<PropertyToField> ReplaceProps = new();
 
+    private readonly Stack<List<MemberDeclarationSyntax>> additionalMembers = new();
+    private int classDepth;
+
     public bool NeedGuidConverter { get; set; }
 
     public bool NeedDecimalConverter { get; set; }
 
+
+    public override SyntaxNode? VisitClassDeclaration(ClassDeclarationSyntax node)
+    {
+        if (classDepth > 0) return node;
+
+        classDepth++;
+        additionalMembers.Push([]);
+        var rewrittenClass = (ClassDeclarationSyntax)base.VisitClassDeclaration(node)!;
+        var classAdditionalMembers = additionalMembers.Pop();
+        classDepth--;
+
+        return classAdditionalMembers.Count == 0
+            ? rewrittenClass
+            : rewrittenClass.AddMembers(classAdditionalMembers.ToArray());
+    }
 
     public override SyntaxNode? VisitPropertyDeclaration(PropertyDeclarationSyntax node)
     {
@@ -282,6 +300,7 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
     private PropertyDeclarationSyntax? ConvertToGuidProperty(PropertyDeclarationSyntax property)
     {
+        var originalProperty = property;
         var setter = property.GetSetter();
 
         if (setter.Body == null)
@@ -339,16 +358,27 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
         var originalReturnExpression = returnStatement.Expression;
 
-        if (originalReturnExpression is not IdentifierNameSyntax identifierNameSyntax)
+        var backingMemberName = originalReturnExpression switch
         {
-            log.LogError($"Getter return statement should be a simple identifier in property {property.Identifier}");
+            IdentifierNameSyntax identifierNameSyntax => identifierNameSyntax.Identifier.ValueText,
+            ConditionalExpressionSyntax => AddOneofBackingProperty(originalProperty),
+            _ => null
+        };
+
+        if (backingMemberName == null)
+        {
+            log.LogError($"Getter return statement is not supported in property {property.Identifier}");
             return null;
         }
 
-        ReplaceProps.Add(new PropertyToField(property.Identifier.ValueText, identifierNameSyntax.Identifier.ValueText));
+        ReplaceProps.Add(new PropertyToField(property.Identifier.ValueText, backingMemberName));
 
-        var newReturnExpression = SyntaxFactory.InvocationExpression(SyntaxFactory.ParseExpression("global::System.Guid.Parse"), // Die Methode
-            SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(originalReturnExpression))));
+        ExpressionSyntax newReturnExpression = originalReturnExpression is ConditionalExpressionSyntax conditionalExpression
+            ? conditionalExpression
+                .WithWhenTrue(CreateGuidParseExpression(conditionalExpression.WhenTrue))
+                .WithWhenFalse(SyntaxFactory.DefaultExpression(
+                    SyntaxFactory.ParseTypeName("global::System.Guid")))
+            : CreateGuidParseExpression(originalReturnExpression);
 
         var newReturnStatement = returnStatement.WithExpression(newReturnExpression).WithTrailingTrivia(SyntaxFactory.Space);
 
@@ -379,6 +409,33 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
             property = property.WithType(SyntaxFactory.ParseTypeName("global::System.Guid").WithTrailingTrivia(SyntaxFactory.Space));
 
         return property;
+    }
+
+    private static InvocationExpressionSyntax CreateGuidParseExpression(ExpressionSyntax expression)
+    {
+        return SyntaxFactory.InvocationExpression(
+            SyntaxFactory.ParseExpression("global::System.Guid.Parse"),
+            SyntaxFactory.ArgumentList(
+                SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(expression))));
+    }
+
+    private string AddOneofBackingProperty(PropertyDeclarationSyntax property)
+    {
+        var propertyName = property.Identifier.ValueText;
+        var backingPropertyName = $"__typeMapper{propertyName}Raw";
+        var backingProperty = property
+            .WithAttributeLists([])
+            .WithType(property.Type.WithoutTrivia().WithTrailingTrivia(SyntaxFactory.Space))
+            .WithModifiers(SyntaxFactory.TokenList(
+                SyntaxFactory.Token(SyntaxKind.PrivateKeyword).WithTrailingTrivia(SyntaxFactory.Space)))
+            .WithIdentifier(SyntaxFactory.Identifier(backingPropertyName).WithTrailingTrivia(SyntaxFactory.Space))
+            .WithLeadingTrivia(SyntaxFactory.TriviaList(
+                SyntaxFactory.CarriageReturnLineFeed,
+                SyntaxFactory.Whitespace("    ")))
+            .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+
+        additionalMembers.Peek().Add(backingProperty);
+        return backingPropertyName;
     }
 
     private PropertyDeclarationSyntax? ConvertToDecimalProperty(PropertyDeclarationSyntax property)

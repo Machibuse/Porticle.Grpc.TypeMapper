@@ -101,6 +101,48 @@ message TestMessageNullableRefUnmapped {
   TestMessageEnum1 sub_message = 3;
 }
 
+message TestMessageGuidOneof {
+  oneof identifier {
+    string guid = 1;
+    string text = 2;
+  }
+}
+
+message TestMessageMappedGuidOneof {
+  oneof identifier {
+    // [GrpcGuid]
+    string guid = 1;
+    string text = 2;
+  }
+}
+
+message TestMessageWithNestedGuidOneof {
+  message NestedMappedGuidOneof {
+    oneof identifier {
+      // [GrpcGuid]
+      string guid = 1;
+      string text = 2;
+    }
+  }
+
+  NestedMappedGuidOneof nested = 1;
+}
+
+message TestMessageGuidOneofWithNestedCollision {
+  oneof outer_identifier {
+    // [GrpcGuid]
+    string guid = 1;
+  }
+
+  message NestedUnmappedGuidOneof {
+    oneof nested_identifier {
+      string guid = 1;
+    }
+  }
+
+  NestedUnmappedGuidOneof nested = 2;
+}
+
 enum TestEnum
 {
   FOO = 0;

@@ -19,6 +19,13 @@ public class PropertyToFieldRewriter : CSharpSyntaxRewriter
 
     public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
     {
+        if (node.Parent is MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax oneofCase } memberAccess
+            && memberAccess.Name == node
+            && oneofCase.Identifier.ValueText.EndsWith("OneofCase", StringComparison.Ordinal))
+        {
+            return base.VisitIdentifierName(node);
+        }
+
         var mapping = ReplaceNames.SingleOrDefault(field => field.PropertyName == node.Identifier.Text);
 
         if (mapping != null) return SyntaxFactory.IdentifierName(mapping.FieldName).WithTriviaFrom(node);

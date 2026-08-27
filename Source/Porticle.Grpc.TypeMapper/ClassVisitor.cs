@@ -19,6 +19,7 @@ public class ClassVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings,
         // Add marker
         var trivia = node.GetLeadingTrivia().Add(SyntaxFactory.Comment("/// <remark>" + marker + "</remark>")).Add(SyntaxFactory.CarriageReturnLineFeed);
         node = node.WithLeadingTrivia(trivia);
+        node = (ClassDeclarationSyntax)base.VisitClassDeclaration(node)!;
 
         var nullableReferenceTypes = node.GetLeadingTrivia().ToFullString().Contains("[NullableReferenceTypes]");
 
