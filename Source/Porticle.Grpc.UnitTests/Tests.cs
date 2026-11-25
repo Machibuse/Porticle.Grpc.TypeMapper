@@ -177,6 +177,28 @@ public sealed class Tests
     }
 
     [TestMethod]
+    public void TestListsAreReadOnlyCollections()
+    {
+        var message = new TestMessageMapped { SingleGuid = Guid4, ListOfGuid = { Guid1, Guid2, Guid3 }, ListOfDecimal = { 1.5m, -99.99m } };
+
+        // Must be assignable without copying (no ToList required)
+        IReadOnlyCollection<Guid> guidCollection = message.ListOfGuid;
+        IReadOnlyList<Guid> guidList = message.ListOfGuid;
+        IReadOnlyCollection<decimal> decimalCollection = message.ListOfDecimal;
+        IReadOnlyList<decimal> decimalList = message.ListOfDecimal;
+
+        Assert.AreEqual(3, guidCollection.Count);
+        Assert.AreEqual(Guid2, guidList[1]);
+        Assert.AreEqual(2, decimalCollection.Count);
+        Assert.AreEqual(-99.99m, decimalList[1]);
+
+        // Count and indexer must stay unambiguous on the list interface itself
+        Assert.AreEqual(3, message.ListOfGuid.Count);
+        message.ListOfGuid[0] = Guid5;
+        Assert.AreEqual(Guid5, guidList[0]);
+    }
+
+    [TestMethod]
     public void TestWithNull()
     {
         Guid[] guids = [Guid1, Guid2, Guid3];

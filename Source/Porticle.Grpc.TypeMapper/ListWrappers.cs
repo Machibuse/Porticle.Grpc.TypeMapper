@@ -3,10 +3,16 @@
 public static class ListWrappers
 {
     public static string IListWithRangeAdd = """
-                                             public interface IListWithRangeAdd<T> : System.Collections.Generic.IList<T>
+                                             public interface IListWithRangeAdd<T> : System.Collections.Generic.IList<T>, System.Collections.Generic.IReadOnlyList<T>
                                              {
-                                                 void Add(IEnumerable<T> items);                   
-                                             }        
+                                                 void Add(IEnumerable<T> items);
+
+                                                 // Redeclared to avoid ambiguity between IList<T> and IReadOnlyList<T>
+                                                 new int Count { get; }
+
+                                                 // Redeclared to avoid ambiguity between IList<T> and IReadOnlyList<T>
+                                                 new T this[int index] { get; set; }
+                                             }
                                              """;
 
     public static string RepeatedFieldGuidWrapper = """

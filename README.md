@@ -244,7 +244,7 @@ public string? Description {
 #nullable disable
 
 /// <summary>[GrpcGuid] List of roles</summary>
-public IList<Guid> RoleIds {
+public IListWithRangeAdd<Guid> RoleIds {
   get 
   {
       // returns a wrapper that converts a list of strings to a list of guids 
