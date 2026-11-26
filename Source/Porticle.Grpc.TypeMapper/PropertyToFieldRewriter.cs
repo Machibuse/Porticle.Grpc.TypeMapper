@@ -26,6 +26,19 @@ public class PropertyToFieldRewriter : CSharpSyntaxRewriter
             return base.VisitIdentifierName(node);
         }
 
+        // The last part of a qualified type name (e.g. global::Google.Protobuf.WellKnownTypes.Timestamp) is not a property
+        // reference, even if a property with the same name exists (proto field "timestamp")
+        if (node.Parent is QualifiedNameSyntax qualifiedName && qualifiedName.Right == node) return base.VisitIdentifierName(node);
+
+        // A member access is only a property reference if it is accessed on a simple instance (other.Timestamp, this.Timestamp).
+        // Everything else is a namespace qualified type (global::Google.Protobuf.WellKnownTypes.Timestamp.FromDateTime(...))
+        if (node.Parent is MemberAccessExpressionSyntax parentAccess
+            && parentAccess.Name == node
+            && parentAccess.Expression is not (IdentifierNameSyntax or ThisExpressionSyntax))
+        {
+            return base.VisitIdentifierName(node);
+        }
+
         var mapping = ReplaceNames.SingleOrDefault(field => field.PropertyName == node.Identifier.Text);
 
         if (mapping != null) return SyntaxFactory.IdentifierName(mapping.FieldName).WithTriviaFrom(node);

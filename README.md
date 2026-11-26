@@ -43,6 +43,7 @@ Code.
 - Add `// [NullableString]` as comment to a string or StringValue proto field to get string? in generated c# code
 - Add `// [NullableEnum]` as comment to an optional enum proto field to get MyEnum? in generated c# code
 - Add `// [NullableReferenceTypes]` as comment above a message to wrap all reference type properties with `#nullable enable/disable` and make nullable ones `string?` / `TypeName?`
+- Add `// [NotNull]` / `// [DisallowNull]` as comment to a message or google.protobuf.Timestamp proto field (or above a message for all such fields) to get the .NET `[NotNull]` / `[DisallowNull]` attribute on the generated property. `// [MaybeNull]` exempts a single field
 - Add PorticleGrpcTypeMapper_WrapAllNonNullableStrings as Property to your Project to wrap all not nullable proto stings in #nullable enable/disable
 - Add PorticleGrpcTypeMapper_WrapAllNullableStrings as Property to your Project to wrap all proto StringValue fields in #nullable enable/disable and change `string` to `string?`
 
@@ -86,6 +87,10 @@ There are several things you can do in your .proto files:
 - Add `// [NullableString]` as comment to a StringValue field - Converts the corresponding c# string property to string?
 - Add `// [NullableEnum]` as comment to a optional enum field - Converts the corresponding optional proto enum to a C# nullable Enum
 - Add `// [NullableReferenceTypes]` as comment above a message definition - Enables full nullable reference type support for the entire message (see below)
+- Add `// [NotNull]` as comment to a message or google.protobuf.Timestamp field - Adds `[System.Diagnostics.CodeAnalysis.NotNull]` to the corresponding c# property (see below)
+- Add `// [DisallowNull]` as comment to a message or google.protobuf.Timestamp field - Adds `[System.Diagnostics.CodeAnalysis.DisallowNull]` to the corresponding c# property (see below)
+- Add `// [NotNull]` and/or `// [DisallowNull]` as comment above a message definition - Applies the attribute to all message and Timestamp fields of that message
+- Add `// [MaybeNull]` as comment to a field - Exempts this field from the `[NotNull]` / `[DisallowNull]` comment above the message
 
 First an Example of a default .proto file
 
@@ -407,6 +412,82 @@ public int Age {
 }
 ```
 
+## `[NotNull]` / `[DisallowNull]` - Nullability Attributes for Message and Timestamp Fields
+
+Protoc generates properties for message fields (including `google.protobuf.Timestamp`) without any null check, so they can always be null. If you know better, you can tell
+the compiler with the standard .NET attributes from `System.Diagnostics.CodeAnalysis`:
+
+- `// [NotNull]` adds `[NotNull]` to the property: reading it never yields a "may be null" warning, even if the property type is `TypeName?` or `DateTime?`
+- `// [DisallowNull]` adds `[DisallowNull]` to the property: assigning `null` yields a compiler warning
+
+The markers can be written
+
+- **above a field** whose type is a message or `google.protobuf.Timestamp` (with or without `[DateTime]` / `[DateTimeOffset]`)
+- **above a message** to apply them to all message and Timestamp fields of this message. Other fields (strings, scalars, enums, repeated fields, maps, `oneof` members) are not
+  touched and nested messages do not inherit the setting
+
+Add `// [MaybeNull]` to a field to exempt it from the markers above the message. A `[NotNull]` / `[DisallowNull]` written directly on that field still applies.
+
+The markers can be combined with `[NullableReferenceTypes]`, `[DateTime]` and `[DateTimeOffset]`.
+
+### Example
+
+```protobuf
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+// [NotNull] [DisallowNull]
+message Order {
+    Customer customer = 1;
+
+    // [DateTimeOffset]
+    google.protobuf.Timestamp created_at = 2;
+
+    // [MaybeNull] Only set for shipped orders
+    Address shipping_address = 3;
+
+    string comment = 4;
+}
+```
+
+Will result in generated code like this:
+
+```csharp
+[global::System.Diagnostics.CodeAnalysis.NotNull]
+[global::System.Diagnostics.CodeAnalysis.DisallowNull]
+public global::MyNamespace.Customer Customer {
+  get { return customer_; }
+  set { customer_ = value; }
+}
+
+[global::System.Diagnostics.CodeAnalysis.NotNull]
+[global::System.Diagnostics.CodeAnalysis.DisallowNull]
+public global::System.DateTimeOffset? CreatedAt {
+  get {if(createdAt_==null)return default; return createdAt_.ToDateTimeOffset(); }
+  set { createdAt_ = value == null ? null : global::Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(value.Value); }
+}
+
+// [MaybeNull] - no attributes
+public global::MyNamespace.Address ShippingAddress {
+  get { return shippingAddress_; }
+  set { shippingAddress_ = value; }
+}
+
+// string - not affected
+public string Comment {
+  get { return comment_; }
+  set { comment_ = pb::ProtoPreconditions.CheckNotNull(value, "value"); }
+}
+```
+
+### Things to know
+
+- The markers **only add attributes**. Type, getter and setter of the property are not changed and there is no check at runtime: a field that was never set (e.g. in a
+  message received from another service) is still `null`, even with `[NotNull]`
+- `[NotNull]` / `[DisallowNull]` directly on a field of another kind (e.g. a `string`) is ignored and reported as a build warning
+- The attributes exist in .NET Core 3.0+ and .NET Standard 2.1+. Projects targeting older frameworks cannot use the markers
+
 ## Support for 'Nullable Reference Types' (Project-wide Settings)
 
 There are actually 2 Settings for Nullable Reference Types you can set in your Project file, or better in Directory.Build.props
@@ -477,6 +558,8 @@ public string? OptionalParentUserId {
 - Mapping `repeated google.protobuf.StringValue` to `List<Guid?>` or `List<string?>` because grpc internally uses `RepeatedField<string>` instead of `RepeatedField<StringValue>`.
   This may be a bug in protoc compiler, because it is also not possible to add `null` to `repeated google.protobuf.StringValue` because there is a not null check in the Add
   function in `RepeatedField<T>`
+
+- `[NotNull]` / `[DisallowNull]` on message fields inside a `oneof`. A oneof member is always `null` when another case is set, so these fields are ignored
 
 - This Tool actually is not tested with protoc / Grpc.Tools is compiled with GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE flag
 

@@ -468,6 +468,164 @@ public sealed class Tests
         Assert.IsNotNull(deserialized.SubMessage);
     }
 
+    private static void AssertNullabilityAttributes(System.Type type, string propertyName, bool notNull, bool disallowNull)
+    {
+        var property = type.GetProperty(propertyName);
+        Assert.IsNotNull(property, $"Property {propertyName} not found");
+
+        // The compiler does not keep these attributes on the property itself: [NotNull] is emitted on the return
+        // value of the getter and [DisallowNull] on the value parameter of the setter.
+        var notNullCount = property.GetMethod!.ReturnParameter.GetCustomAttributes(typeof(System.Diagnostics.CodeAnalysis.NotNullAttribute), false).Length;
+        var disallowNullCount = property.SetMethod == null
+            ? 0
+            : property.SetMethod.GetParameters()[0].GetCustomAttributes(typeof(System.Diagnostics.CodeAnalysis.DisallowNullAttribute), false).Length;
+
+        Assert.AreEqual(notNull ? 1 : 0, notNullCount, $"NotNull attribute count on {type.Name}.{propertyName}");
+        Assert.AreEqual(disallowNull ? 1 : 0, disallowNullCount, $"DisallowNull attribute count on {type.Name}.{propertyName}");
+    }
+
+    [TestMethod]
+    public void TestTimestampFieldNamedTimestamp()
+    {
+        // A field named "timestamp" generates a property "Timestamp" that collides with the type name Timestamp
+        var dateTimeMessage = new TestMessageTimestampNamedDateTime { Timestamp = UtcDateTime1 };
+        var dateTimeCopy = TestMessageTimestampNamedDateTime.Parser.ParseFrom(dateTimeMessage.ToByteArray());
+        Assert.AreEqual(UtcDateTime1, dateTimeCopy.Timestamp);
+        Assert.AreEqual(dateTimeMessage, dateTimeCopy);
+        Assert.AreEqual(dateTimeMessage.GetHashCode(), dateTimeCopy.GetHashCode());
+        Assert.AreEqual(UtcDateTime1, dateTimeMessage.Clone().Timestamp);
+
+        // MergeFrom must create and merge the backing Timestamp
+        var merged = new TestMessageTimestampNamedDateTime();
+        merged.MergeFrom(dateTimeMessage);
+        Assert.AreEqual(UtcDateTime1, merged.Timestamp);
+
+        var emptyCopy = TestMessageTimestampNamedDateTime.Parser.ParseFrom(new TestMessageTimestampNamedDateTime().ToByteArray());
+        Assert.IsNull(emptyCopy.Timestamp);
+
+        var offsetMessage = new TestMessageTimestampNamedDateTimeOffset { Timestamp = DateTimeOffset1 };
+        var offsetCopy = TestMessageTimestampNamedDateTimeOffset.Parser.ParseFrom(offsetMessage.ToByteArray());
+        Assert.AreEqual(DateTimeOffset1, offsetCopy.Timestamp);
+        Assert.AreEqual(offsetMessage, offsetCopy);
+    }
+
+    [TestMethod]
+    public void TestNullabilityAttributesFieldMarkers()
+    {
+        var type = typeof(TestMessageNullabilityFields);
+
+        AssertNullabilityAttributes(type, "NotNullMessage", true, false);
+        AssertNullabilityAttributes(type, "DisallowNullMessage", false, true);
+        AssertNullabilityAttributes(type, "BothMessage", true, true);
+        AssertNullabilityAttributes(type, "PlainMessage", false, false);
+        AssertNullabilityAttributes(type, "NotNullTimestamp", true, false);
+        AssertNullabilityAttributes(type, "NotNullDateTime", true, false);
+        AssertNullabilityAttributes(type, "DisallowNullDateTimeOffset", false, true);
+
+        // The markers must not change the property types
+        Assert.AreEqual(typeof(TestMessageEnum1), type.GetProperty("NotNullMessage")!.PropertyType);
+        Assert.AreEqual(typeof(Timestamp), type.GetProperty("NotNullTimestamp")!.PropertyType);
+        Assert.AreEqual(typeof(DateTime?), type.GetProperty("NotNullDateTime")!.PropertyType);
+        Assert.AreEqual(typeof(DateTimeOffset?), type.GetProperty("DisallowNullDateTimeOffset")!.PropertyType);
+    }
+
+    [TestMethod]
+    public void TestNullabilityAttributesNotEligibleFields()
+    {
+        var type = typeof(TestMessageNullabilityFields);
+
+        // Field markers on strings and repeated fields are ignored (build warning only)
+        AssertNullabilityAttributes(type, "NotEligibleString", false, false);
+        AssertNullabilityAttributes(type, "NotEligibleRepeated", false, false);
+    }
+
+    [TestMethod]
+    public void TestNullabilityAttributesDoNotChangeRuntimeBehavior()
+    {
+        var message = new TestMessageNullabilityFields
+        {
+            NotNullMessage = new TestMessageEnum1 { EnumOptional = TestEnum.Bar },
+            DisallowNullMessage = new TestMessageEnum1(),
+            NotNullTimestamp = Timestamp.FromDateTime(UtcDateTime1),
+            NotNullDateTime = UtcDateTime1,
+            DisallowNullDateTimeOffset = DateTimeOffset1
+        };
+
+        // No runtime check: null is still accepted
+        message.DisallowNullMessage = null!;
+        Assert.IsNull(message.DisallowNullMessage);
+        message.DisallowNullDateTimeOffset = null!;
+        Assert.IsNull(message.DisallowNullDateTimeOffset);
+
+        message.DisallowNullMessage = new TestMessageEnum1();
+        message.DisallowNullDateTimeOffset = DateTimeOffset1;
+
+        var deserialized = TestMessageNullabilityFields.Parser.ParseFrom(message.ToByteArray());
+
+        Assert.AreEqual(TestEnum.Bar, deserialized.NotNullMessage.EnumOptional);
+        Assert.IsNotNull(deserialized.DisallowNullMessage);
+        Assert.IsNull(deserialized.BothMessage);
+        Assert.IsNull(deserialized.PlainMessage);
+        Assert.AreEqual(UtcDateTime1, deserialized.NotNullTimestamp.ToDateTime());
+        Assert.AreEqual(UtcDateTime1, deserialized.NotNullDateTime);
+        Assert.AreEqual(DateTimeOffset1, deserialized.DisallowNullDateTimeOffset);
+        Assert.AreEqual(message, deserialized);
+    }
+
+    [TestMethod]
+    public void TestNullabilityAttributesNullableAnalysis()
+    {
+        // This test compiles in a nullable enabled context. Without the NotNull attributes the two reads below
+        // would raise CS8600 / CS8629, which fails the Debug build (warnings as errors).
+        var message = new TestMessageNullabilityNullableRef { SubMessage = new TestMessageEnum1() };
+        TestMessageEnum1 subMessage = message.SubMessage;
+        Assert.IsNotNull(subMessage);
+
+        var fields = new TestMessageNullabilityFields { NotNullDateTime = UtcDateTime1 };
+        DateTime dateTime = fields.NotNullDateTime.Value;
+        Assert.AreEqual(UtcDateTime1, dateTime);
+    }
+
+    [TestMethod]
+    public void TestNullabilityAttributesMessageDefaults()
+    {
+        var type = typeof(TestMessageNullabilityDefaults);
+
+        // Message and Timestamp fields get the message-level defaults
+        AssertNullabilityAttributes(type, "SubMessage", true, true);
+        AssertNullabilityAttributes(type, "CreatedAt", true, true);
+        AssertNullabilityAttributes(type, "Nested", true, true);
+        Assert.AreEqual(typeof(DateTimeOffset?), type.GetProperty("CreatedAt")!.PropertyType);
+
+        // Other field kinds are not touched
+        AssertNullabilityAttributes(type, "SomeString", false, false);
+        AssertNullabilityAttributes(type, "SomeInt", false, false);
+        AssertNullabilityAttributes(type, "RepeatedMessage", false, false);
+        AssertNullabilityAttributes(type, "ChoiceMessage", false, false);
+        AssertNullabilityAttributes(type, "ChoiceText", false, false);
+
+        // [MaybeNull] exempts a field, explicit field markers still apply
+        AssertNullabilityAttributes(type, "MaybeNullMessage", false, false);
+        AssertNullabilityAttributes(type, "MaybeNullDisallowMessage", false, true);
+
+        // Nested messages do not inherit the defaults
+        AssertNullabilityAttributes(typeof(TestMessageNullabilityDefaults.Types.Nested), "NestedSub", false, false);
+    }
+
+    [TestMethod]
+    public void TestNullabilityAttributesWithNullableReferenceTypes()
+    {
+        var type = typeof(TestMessageNullabilityNullableRef);
+
+        var subMessage = type.GetProperty("SubMessage")!;
+        Assert.AreEqual(typeof(TestMessageEnum1), subMessage.PropertyType);
+        AssertNullabilityAttributes(type, "SubMessage", true, false);
+
+        // The property is still declared as TestMessageEnum1? - check the raw compiler annotation because
+        // NullabilityInfoContext already evaluates the NotNull attribute for the read state
+        Assert.AreEqual(NullabilityState.Nullable, new NullabilityInfoContext().Create(subMessage).WriteState);
+    }
+
     [TestMethod]
     public void TestNullableReferenceTypesPropertyTypes()
     {

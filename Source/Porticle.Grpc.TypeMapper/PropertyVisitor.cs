@@ -5,8 +5,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Porticle.Grpc.TypeMapper;
 
-public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings, bool wrapAllNullableStringValues, bool nullableReferenceTypes = false) : CSharpSyntaxRewriter
+public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings, bool wrapAllNullableStringValues, bool nullableReferenceTypes = false,
+    bool notNullDefault = false, bool disallowNullDefault = false) : CSharpSyntaxRewriter
 {
+    private const string NotNullMarker = "[NotNull]";
+    private const string DisallowNullMarker = "[DisallowNull]";
+    private const string MaybeNullMarker = "[MaybeNull]";
+
     public HashSet<PropertyToField> ReplaceProps = new();
 
     private readonly Stack<List<MemberDeclarationSyntax>> additionalMembers = new();
@@ -34,9 +39,97 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
     public override SyntaxNode? VisitPropertyDeclaration(PropertyDeclarationSyntax node)
     {
-        var newProperty = CheckProperty(node);
+        var newProperty = CheckProperty(node) ?? node;
 
-        return newProperty ?? node;
+        return ApplyNullabilityAttributes(node, newProperty);
+    }
+
+    /// <summary>
+    ///     Adds the NotNull / DisallowNull attributes requested by the [NotNull], [DisallowNull] and [MaybeNull] markers.
+    ///     Markers and eligibility are evaluated on the original protoc property, the attributes are added to the
+    ///     (possibly rewritten) result.
+    /// </summary>
+    private PropertyDeclarationSyntax ApplyNullabilityAttributes(PropertyDeclarationSyntax original, PropertyDeclarationSyntax result)
+    {
+        var comment = original.GetLeadingTrivia().ToFullString();
+        var fieldNotNull = comment.Contains(NotNullMarker);
+        var fieldDisallowNull = comment.Contains(DisallowNullMarker);
+
+        if (!IsMessageTypedProperty(original))
+        {
+            // Message-level defaults silently skip other field kinds, explicit field markers are reported
+            if (fieldNotNull) LogMarkerNotSupported(original, NotNullMarker);
+            if (fieldDisallowNull) LogMarkerNotSupported(original, DisallowNullMarker);
+
+            return result;
+        }
+
+        // [MaybeNull] only cancels the message-level defaults, explicit field markers always apply
+        var maybeNull = comment.Contains(MaybeNullMarker);
+        var notNull = fieldNotNull || (notNullDefault && !maybeNull);
+        var disallowNull = fieldDisallowNull || (disallowNullDefault && !maybeNull);
+
+        if (notNull) result = AddAttribute(result, "global::System.Diagnostics.CodeAnalysis.NotNull");
+        if (disallowNull) result = AddAttribute(result, "global::System.Diagnostics.CodeAnalysis.DisallowNull");
+
+        return result;
+    }
+
+    private void LogMarkerNotSupported(PropertyDeclarationSyntax property, string marker)
+    {
+        log.LogWarning($"{marker} is only supported for message and Timestamp fields and is ignored for property {property.Identifier}");
+    }
+
+    private static PropertyDeclarationSyntax AddAttribute(PropertyDeclarationSyntax property, string attributeName)
+    {
+        var attributeList = SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Attribute(SyntaxFactory.ParseName(attributeName))));
+
+        if (property.AttributeLists.Count > 0)
+        {
+            // Append after the existing lists, the leading trivia of the property (doc comment, #nullable) hangs on the first one
+            var lastList = property.AttributeLists.Last();
+            var indentation = lastList.GetLeadingTrivia().Where(t => t.IsKind(SyntaxKind.WhitespaceTrivia)).TakeLast(1);
+
+            attributeList = attributeList.WithLeadingTrivia(indentation).WithTrailingTrivia(lastList.GetTrailingTrivia());
+
+            return property.WithAttributeLists(property.AttributeLists.Add(attributeList));
+        }
+
+        // No attribute lists yet: the new list takes over the leading trivia so comments and directives stay on top
+        var leadingTrivia = property.GetLeadingTrivia();
+        var propertyIndentation = leadingTrivia.Where(t => t.IsKind(SyntaxKind.WhitespaceTrivia)).TakeLast(1);
+
+        attributeList = attributeList.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+
+        return property.WithLeadingTrivia(propertyIndentation).WithAttributeLists(SyntaxFactory.SingletonList(attributeList));
+    }
+
+    /// <summary>
+    ///     Checks if a protoc generated property belongs to a message typed field (including google.protobuf.Timestamp).
+    ///     Enums, optional fields, oneof members, repeated fields, maps and scalar types are not message typed.
+    /// </summary>
+    private static bool IsMessageTypedProperty(PropertyDeclarationSyntax property)
+    {
+        // Message references use fully qualified types (global::Namespace.TypeName)
+        if (!property.Type.ToString().TrimEnd().StartsWith("global::")) return false;
+
+        var setter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.SetAccessorDeclaration));
+        if (setter?.Body == null) return false;
+
+        // Optional enums/fields use _hasBits in their setter
+        if (setter.Body.ToFullString().Contains("_hasBits")) return false;
+
+        // Find backing field in the containing class to distinguish required enums from messages
+        var getter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.GetAccessorDeclaration));
+        var returnStatement = getter?.Body?.Statements.OfType<ReturnStatementSyntax>().FirstOrDefault();
+        if (returnStatement?.Expression is not IdentifierNameSyntax fieldIdentifier) return false;
+
+        var containingClass = property.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+        var backingField = containingClass?.Members.OfType<FieldDeclarationSyntax>().SelectMany(f => f.Declaration.Variables)
+            .FirstOrDefault(v => v.Identifier.Text == fieldIdentifier.Identifier.Text);
+
+        // Required enums have an initializer (e.g. = global::X.TestEnum.Foo)
+        return backingField?.Initializer == null;
     }
 
     private PropertyDeclarationSyntax? CheckProperty(PropertyDeclarationSyntax property)
@@ -264,27 +357,8 @@ public class PropertyVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrin
 
     private PropertyDeclarationSyntax? ConvertToNullableMessageProperty(PropertyDeclarationSyntax property)
     {
-        // Only transform fully qualified types (message references use global::Namespace.TypeName)
-        var propertyType = property.Type.ToString().TrimEnd();
-        if (!propertyType.StartsWith("global::")) return null;
-
-        var setter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.SetAccessorDeclaration));
-        if (setter?.Body == null) return null;
-
-        // Optional enums/fields use _hasBits in their setter — skip those
-        if (setter.Body.ToFullString().Contains("_hasBits")) return null;
-
-        // Find backing field in the containing class to distinguish required enums from messages
-        var getter = property.AccessorList?.Accessors.FirstOrDefault(a => a.IsKind(SyntaxKind.GetAccessorDeclaration));
-        var returnStatement = getter?.Body?.Statements.OfType<ReturnStatementSyntax>().FirstOrDefault();
-        if (returnStatement?.Expression is not IdentifierNameSyntax fieldIdentifier) return null;
-
-        var containingClass = property.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
-        var backingField = containingClass?.Members.OfType<FieldDeclarationSyntax>().SelectMany(f => f.Declaration.Variables)
-            .FirstOrDefault(v => v.Identifier.Text == fieldIdentifier.Identifier.Text);
-
-        // Required enums have an initializer (e.g. = global::X.TestEnum.Foo) — skip those
-        if (backingField?.Initializer != null) return null;
+        // Only message typed properties are transformed
+        if (!IsMessageTypedProperty(property)) return null;
 
         var enableDirective =
             SyntaxFactory.Trivia(SyntaxFactory.NullableDirectiveTrivia(SyntaxFactory.Token(SyntaxKind.EnableKeyword).WithLeadingTrivia(SyntaxFactory.Space), true));

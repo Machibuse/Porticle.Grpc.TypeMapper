@@ -21,9 +21,14 @@ public class ClassVisitor(TaskLoggingHelper log, bool wrapAllNonNullableStrings,
         node = node.WithLeadingTrivia(trivia);
         node = (ClassDeclarationSyntax)base.VisitClassDeclaration(node)!;
 
-        var nullableReferenceTypes = node.GetLeadingTrivia().ToFullString().Contains("[NullableReferenceTypes]");
+        var classComment = node.GetLeadingTrivia().ToFullString();
+        var nullableReferenceTypes = classComment.Contains("[NullableReferenceTypes]");
 
-        var propertyVisitor = new PropertyVisitor(log, wrapAllNonNullableStrings, wrapAllNullableStringValues, nullableReferenceTypes);
+        // Message-level defaults for the nullability attributes of message and Timestamp fields
+        var notNullDefault = classComment.Contains("[NotNull]");
+        var disallowNullDefault = classComment.Contains("[DisallowNull]");
+
+        var propertyVisitor = new PropertyVisitor(log, wrapAllNonNullableStrings, wrapAllNullableStringValues, nullableReferenceTypes, notNullDefault, disallowNullDefault);
         node = (ClassDeclarationSyntax)propertyVisitor.Visit(node);
 
         if (propertyVisitor.NeedGuidConverter)

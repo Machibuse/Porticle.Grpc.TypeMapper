@@ -148,3 +148,79 @@ enum TestEnum
   FOO = 0;
   BAR = 1;
 }
+
+// Fields named like their type: the property name "Timestamp" collides with the type name Timestamp
+message TestMessageTimestampNamedDateTime {
+  // [DateTime]
+  google.protobuf.Timestamp timestamp = 1;
+}
+
+message TestMessageTimestampNamedDateTimeOffset {
+  // [DateTimeOffset]
+  google.protobuf.Timestamp timestamp = 1;
+}
+
+// Field-level nullability attribute markers
+message TestMessageNullabilityFields {
+  // [NotNull]
+  TestMessageEnum1 not_null_message = 1;
+
+  // [DisallowNull]
+  TestMessageEnum1 disallow_null_message = 2;
+
+  // [NotNull] [DisallowNull]
+  TestMessageEnum1 both_message = 3;
+
+  TestMessageEnum1 plain_message = 4;
+
+  // [NotNull]
+  google.protobuf.Timestamp not_null_timestamp = 5;
+
+  // [DateTime] [NotNull]
+  google.protobuf.Timestamp not_null_date_time = 6;
+
+  // [DateTimeOffset] [DisallowNull]
+  google.protobuf.Timestamp disallow_null_date_time_offset = 7;
+
+  // [NotNull] not supported on strings - ignored with a build warning
+  string not_eligible_string = 8;
+
+  // [DisallowNull] not supported on repeated fields - ignored with a build warning
+  repeated TestMessageEnum1 not_eligible_repeated = 9;
+}
+
+// Message-level defaults: [NotNull] [DisallowNull]
+message TestMessageNullabilityDefaults {
+  TestMessageEnum1 sub_message = 1;
+
+  // [DateTimeOffset]
+  google.protobuf.Timestamp created_at = 2;
+
+  string some_string = 3;
+
+  int32 some_int = 4;
+
+  repeated TestMessageEnum1 repeated_message = 5;
+
+  oneof choice {
+    TestMessageEnum1 choice_message = 6;
+    string choice_text = 7;
+  }
+
+  // [MaybeNull]
+  TestMessageEnum1 maybe_null_message = 8;
+
+  // [MaybeNull] [DisallowNull]
+  TestMessageEnum1 maybe_null_disallow_message = 9;
+
+  message Nested {
+    TestMessageEnum1 nested_sub = 1;
+  }
+
+  Nested nested = 10;
+}
+
+// [NullableReferenceTypes] [NotNull]
+message TestMessageNullabilityNullableRef {
+  TestMessageEnum1 sub_message = 1;
+}
